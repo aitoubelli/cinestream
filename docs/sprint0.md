@@ -7,7 +7,7 @@
 
 ## Deliverables
 
-- [ ] GitHub/GitLab repository created: `cinestream`
+- [x] GitHub/GitLab repository created: `cinestream`
 - [ ] Consistent project structure defined
 - [ ] `docker-compose.yml` with all services and infrastructure (MongoDB, Redis, RabbitMQ)
 - [ ] Each microservice initialized with:
