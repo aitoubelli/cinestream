@@ -8,16 +8,16 @@
 ## Deliverables
 
 - [x] GitHub/GitLab repository created: `cinestream`
-- [ ] Consistent project structure defined
-- [ ] `docker-compose.yml` with all services and infrastructure (MongoDB, Redis, RabbitMQ)
-- [ ] Each microservice initialized with:
+- [x] Consistent project structure defined
+- [x] `docker-compose.yml` with all services and infrastructure (MongoDB, Redis, RabbitMQ)
+- [x] Each microservice initialized with:
   - Minimal Express server
   - `.env.example`
   - `Dockerfile`
   - Basic health-check endpoint
-- [ ] Next.js frontend bootstrapped (App Router + TypeScript)
-- [ ] Full stack runs with `docker-compose up --build`
-- [ ] Initial commit pushed to `main`
+- [x] Next.js frontend bootstrapped (App Router + TypeScript)
+- [x] Full stack runs with `docker-compose up --build`
+- [x] Initial commit pushed to `main`
 
 ---
 
