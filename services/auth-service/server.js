@@ -52,6 +52,43 @@ const generateRefreshToken = (user) => {
 };
 
 // Routes
+
+/**
+ * @swagger
+ * /register:
+ *   post:
+ *     summary: Register a new user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *                 minLength: 1
+ *     responses:
+ *       201:
+ *         description: User registered successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthResponse'
+ *       400:
+ *         description: Bad request - Email and password required
+ *       409:
+ *         description: User already exists
+ *       500:
+ *         description: Internal server error
+ */
 app.post('/register', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -73,13 +110,48 @@ app.post('/register', async (req, res) => {
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
         });
         await refreshTokenDoc.save();
-
         res.status(201).json({ accessToken, refreshToken });
     } catch (err) {
         res.status(500).json({ error: 'Internal server error' });
     }
 });
 
+/**
+* @swagger
+* /login:
+*   post:
+*     summary: Login user
+*     tags: [Auth]
+*     requestBody:
+*       required: true
+*       content:
+*         application/json:
+*           schema:
+*             type: object
+*             required:
+*               - email
+*               - password
+*             properties:
+*               email:
+*                 type: string
+*                 format: email
+*               password:
+*                 type: string
+*                 minLength: 1
+*     responses:
+*       200:
+*         description: Login successful
+*         content:
+*           application/json:
+*             schema:
+*               $ref: '#/components/schemas/AuthResponse'
+*       400:
+*         description: Bad request - Email and password required
+*       401:
+*         description: Invalid credentials
+*       500:
+*         description: Internal server error
+*/
 app.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -109,6 +181,40 @@ app.post('/login', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /refresh:
+ *   post:
+ *     summary: Refresh access token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - refreshToken
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: New access token generated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 accessToken:
+ *                   type: string
+ *       400:
+ *         description: Bad request - Refresh token required
+ *       401:
+ *         description: Invalid or expired refresh token
+ *       500:
+ *         description: Internal server error
+ */
 app.post('/refresh', async (req, res) => {
     try {
         const { refreshToken } = req.body;
@@ -133,6 +239,37 @@ app.post('/refresh', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /verify:
+ *   post:
+ *     summary: Verify access token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *             properties:
+ *               token:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Token verified successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/VerifyResponse'
+ *       400:
+ *         description: Bad request - Token required
+ *       401:
+ *         description: Invalid token
+ *       500:
+ *         description: Internal server error
+ */
 app.post('/verify', async (req, res) => {
     try {
         const { token } = req.body;
@@ -165,6 +302,56 @@ const swaggerOptions = {
                 url: 'http://localhost:4001',
             },
         ],
+        tags: [
+            {
+                name: 'Auth',
+                description: 'Authentication endpoints'
+            }
+        ],
+        components: {
+            schemas: {
+                User: {
+                    type: 'object',
+                    properties: {
+                        _id: { type: 'string' },
+                        email: { type: 'string', format: 'email' },
+                        passwordHash: { type: 'string' },
+                        role: { type: 'string', enum: ['user', 'admin'] },
+                        createdAt: { type: 'string', format: 'date-time' }
+                    }
+                },
+                RefreshToken: {
+                    type: 'object',
+                    properties: {
+                        _id: { type: 'string' },
+                        token: { type: 'string' },
+                        userId: { type: 'string' },
+                        expiresAt: { type: 'string', format: 'date-time' }
+                    }
+                },
+                AuthResponse: {
+                    type: 'object',
+                    properties: {
+                        accessToken: { type: 'string' },
+                        refreshToken: { type: 'string' }
+                    }
+                },
+                VerifyResponse: {
+                    type: 'object',
+                    properties: {
+                        user: {
+                            $ref: '#/components/schemas/User'
+                        }
+                    }
+                },
+                ErrorResponse: {
+                    type: 'object',
+                    properties: {
+                        error: { type: 'string' }
+                    }
+                }
+            }
+        }
     },
     apis: ['./server.js'], // files containing annotations
 };

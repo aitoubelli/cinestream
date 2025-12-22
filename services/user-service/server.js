@@ -53,6 +53,35 @@ const verifyToken = async (req, res, next) => {
 };
 
 // Routes
+
+/**
+ * @swagger
+ * /profile:
+ *   get:
+ *     summary: Get user profile
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserProfile'
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 app.get('/profile', verifyToken, async (req, res) => {
     try {
         const profile = await UserProfile.findOne({ userId: req.user.id });
@@ -80,6 +109,40 @@ app.get('/profile', verifyToken, async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /profile:
+ *   patch:
+ *     summary: Update user profile
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UpdateProfileRequest'
+ *     responses:
+ *       200:
+ *         description: Profile updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserProfile'
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 app.patch('/profile', verifyToken, async (req, res) => {
     try {
         const { fullName, avatar } = req.body;
@@ -100,6 +163,61 @@ app.patch('/profile', verifyToken, async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /watchlist:
+ *   post:
+ *     summary: Add item to watchlist
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AddWatchlistRequest'
+ *     responses:
+ *       201:
+ *         description: Item added to watchlist
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Bad request - tmdbId and type required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Profile not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: Item already in watchlist
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 app.post('/watchlist', verifyToken, async (req, res) => {
     try {
         const { tmdbId, type } = req.body;
@@ -120,6 +238,50 @@ app.post('/watchlist', verifyToken, async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /watchlist/{tmdbId}:
+ *   delete:
+ *     summary: Remove item from watchlist
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: tmdbId
+ *         required: true
+ *         schema:
+ *           type: number
+ *         description: TMDB ID of the item to remove
+ *     responses:
+ *       200:
+ *         description: Item removed from watchlist
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Profile not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 app.delete('/watchlist/:tmdbId', verifyToken, async (req, res) => {
     try {
         const tmdbId = parseInt(req.params.tmdbId);
@@ -147,6 +309,69 @@ const swaggerOptions = {
             {
                 url: 'http://localhost:4002',
             },
+        ],
+        tags: [
+            {
+                name: 'User',
+                description: 'User profile and watchlist endpoints'
+            }
+        ],
+        components: {
+            securitySchemes: {
+                bearerAuth: {
+                    type: 'http',
+                    scheme: 'bearer',
+                    bearerFormat: 'JWT',
+                },
+            },
+            schemas: {
+                UserProfile: {
+                    type: 'object',
+                    properties: {
+                        userId: { type: 'string' },
+                        email: { type: 'string', format: 'email' },
+                        fullName: { type: 'string' },
+                        avatar: { type: 'string' },
+                        watchlist: {
+                            type: 'array',
+                            items: { $ref: '#/components/schemas/WatchlistItem' }
+                        }
+                    }
+                },
+                WatchlistItem: {
+                    type: 'object',
+                    properties: {
+                        tmdbId: { type: 'number' },
+                        type: { type: 'string', enum: ['movie', 'tv'] }
+                    }
+                },
+                UpdateProfileRequest: {
+                    type: 'object',
+                    properties: {
+                        fullName: { type: 'string' },
+                        avatar: { type: 'string' }
+                    }
+                },
+                AddWatchlistRequest: {
+                    type: 'object',
+                    required: ['tmdbId', 'type'],
+                    properties: {
+                        tmdbId: { type: 'number' },
+                        type: { type: 'string', enum: ['movie', 'tv'] }
+                    }
+                },
+                ErrorResponse: {
+                    type: 'object',
+                    properties: {
+                        error: { type: 'string' }
+                    }
+                }
+            }
+        },
+        security: [
+            {
+                bearerAuth: []
+            }
         ],
     },
     apis: ['./server.js'], // files containing annotations
