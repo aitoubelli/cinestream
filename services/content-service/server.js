@@ -23,18 +23,27 @@ redisClient.connect().catch(console.error);
 
 // TMDB API helper
 async function fetchFromTMDB(endpoint) {
-    const url = `https://api.themoviedb.org/3${endpoint}?api_key=${process.env.TMDB_API_KEY}&language=en-US`;
-    const res = await axios.get(url);
+    const url = `https://api.themoviedb.org/3${endpoint}`;
+    const config = {
+        headers: {
+            'Authorization': `Bearer ${process.env.TMDB_API_KEY}`,
+            'accept': 'application/json'
+        },
+        params: {
+            language: 'en-US'
+        }
+    };
+    const res = await axios.get(url, config);
     return res.data;
 }
 
 // Caching logic
 async function getCachedOrFetch(key, fetchFn, ttl = 3600) {
     const cached = await redisClient.get(key);
-    if (cached) return JSON.parse(cached);
+    if (cached) return { data: JSON.parse(cached), cached: true };
     const data = await fetchFn();
     await redisClient.setEx(key, ttl, JSON.stringify(data));
-    return data;
+    return { data, cached: false };
 }
 
 // Swagger setup
@@ -178,8 +187,9 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
  */
 app.get('/movies/trending', async (req, res) => {
     try {
-        const data = await getCachedOrFetch('tmdb:trending:movie:week', () => fetchFromTMDB('/trending/movie/week'));
-        res.json(data);
+        const result = await getCachedOrFetch('tmdb:trending:movie:week', () => fetchFromTMDB('/trending/movie/week'));
+        res.set('X-Cache-Status', result.cached ? 'HIT' : 'MISS');
+        res.json(result.data);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -207,8 +217,9 @@ app.get('/movies/trending', async (req, res) => {
  */
 app.get('/tv/trending', async (req, res) => {
     try {
-        const data = await getCachedOrFetch('tmdb:trending:tv:week', () => fetchFromTMDB('/trending/tv/week'));
-        res.json(data);
+        const result = await getCachedOrFetch('tmdb:trending:tv:week', () => fetchFromTMDB('/trending/tv/week'));
+        res.set('X-Cache-Status', result.cached ? 'HIT' : 'MISS');
+        res.json(result.data);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -251,8 +262,9 @@ app.get('/search', async (req, res) => {
     const { q } = req.query;
     if (!q) return res.status(400).json({ error: 'Query parameter q is required' });
     try {
-        const data = await getCachedOrFetch(`tmdb:search:multi:${q}`, () => fetchFromTMDB(`/search/multi?query=${encodeURIComponent(q)}`));
-        res.json(data);
+        const result = await getCachedOrFetch(`tmdb:search:multi:${q}`, () => fetchFromTMDB(`/search/multi?query=${encodeURIComponent(q)}`));
+        res.set('X-Cache-Status', result.cached ? 'HIT' : 'MISS');
+        res.json(result.data);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

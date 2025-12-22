@@ -8,12 +8,12 @@
 
 ## Deliverables
 
-- [ ] **API Gateway** routes `/api/auth/**`, `/api/user/**`, `/api/content/**` to respective services
-- [ ] **Content Service** fetches data from TMDB API
-- [ ] **Redis caching layer** for TMDB responses (TTL: 1 hour)
+- [x] **API Gateway** routes `/api/auth/**`, `/api/user/**`, `/api/content/**` to respective services
+- [x] **Content Service** fetches data from TMDB API
+- [x] **Redis caching layer** for TMDB responses (TTL: 1 hour)
 - [ ] MongoDB storage for enriched content metadata (optional but recommended)
-- [ ] OpenAPI/Swagger docs on Content Service (`/docs`)
-- [ ] End-to-end test: `GET /api/content/movies/trending` → returns cached or fresh TMDB data
+- [x] OpenAPI/Swagger docs on Content Service (`/docs`)
+- [x] End-to-end test: `GET /api/content/movies/trending` → returns cached or fresh TMDB data
 
 ---
 
@@ -134,28 +134,30 @@ GET http://localhost:3000/api/content/search?q=spider
 
 > All responses should include `id`, `title`/`name`, `poster_path`, `media_type`
 
+> **Note**: Search endpoint requires TMDB v4 Access Token (Bearer authentication). Update `TMDB_API_KEY` in `.env` to your v4 access token for search functionality.
+
 ## Validation Checklist
 
 #### API Gateway
 
-- [ ] GET http://localhost:3000/api/auth/health → Auth Service response
-- [ ] GET http://localhost:3000/api/user/health → User Service
-- [ ] GET http://localhost:3000/api/content/movies/trending → Content data
+- [x] GET http://localhost:3000/api/auth/health → Auth Service response
+- [x] GET http://localhost:3000/api/user/health → User Service
+- [x] GET http://localhost:3000/api/content/movies/trending → Content data
 
 #### Content Service
 
-- [ ] First call to /movies/trending → hits TMDB
-- [ ] Second call (within 1h) → served from Redis (check logs or add cache hit/miss header)
-- [ ] Swagger UI at http://localhost:4003/docs
+- [x] First call to /movies/trending → hits TMDB
+- [x] Second call (within 1h) → served from Redis (check logs or add cache hit/miss header)
+- [x] Swagger UI at http://localhost:4003/docs
 - [ ] Works without internet after first cache (optional test)
 
 #### Infrastructure
 
-- [ ] redis-cli shows keys like `tmdb:trending:movie:week`
-- [ ] TMDB API key not hardcoded — loaded from .env
-- [ ] No CORS issues (handled by frontend or gateway if needed)
+- [x] redis-cli shows keys like `tmdb:trending:movie:week`
+- [x] TMDB API key not hardcoded — loaded from .env
+- [x] No CORS issues (handled by frontend or gateway if needed)
 
 #### Security
 
-- [ ] TMDB API key not committed (add .env to .gitignore)
-- [ ] Rate limiting not required yet (TMDB allows ~40 req/10s)
+- [x] TMDB API key not committed (add .env to .gitignore)
+- [x] Rate limiting not required yet (TMDB allows ~40 req/10s)

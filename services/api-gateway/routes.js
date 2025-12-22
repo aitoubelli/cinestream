@@ -11,6 +11,7 @@ module.exports = (app) => {
     }));
     app.use('/api/content', createProxyMiddleware({
         target: 'http://localhost:4003',
-        changeOrigin: true
+        changeOrigin: true,
+        pathRewrite: { '^/api/content': '' }
     }));
 };
