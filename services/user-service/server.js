@@ -1,4 +1,10 @@
 const express = require('express');
+const mongoose = require('mongoose');
+const axios = require('axios');
+const cors = require('cors');
+const helmet = require('helmet');
+const swaggerJSDoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -6,8 +12,150 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 4002;
 
+// Middleware
+app.use(helmet());
+app.use(cors());
 app.use(express.json());
 
+// MongoDB connection
+mongoose.connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+}).then(() => console.log('Connected to MongoDB'))
+    .catch(err => console.error('MongoDB connection error:', err));
+
+// Schema
+const userProfileSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, required: true, unique: true, ref: 'User' },
+    email: { type: String, required: true },
+    fullName: { type: String, default: '' },
+    avatar: { type: String, default: '' },
+    watchlist: [{
+        tmdbId: { type: Number, required: true },
+        type: { type: String, enum: ['movie', 'tv'], required: true }
+    }]
+});
+
+const UserProfile = mongoose.model('UserProfile', userProfileSchema);
+
+// Auth middleware
+const verifyToken = async (req, res, next) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Missing token' });
+
+    try {
+        const response = await axios.post('http://auth-service:4001/verify', { token });
+        req.user = response.data.user; // { id, email, role }
+        next();
+    } catch (err) {
+        res.status(401).json({ error: 'Invalid token' });
+    }
+};
+
+// Routes
+app.get('/profile', verifyToken, async (req, res) => {
+    try {
+        const profile = await UserProfile.findOne({ userId: req.user.id });
+        if (!profile) {
+            // Create default profile if not exists
+            const newProfile = new UserProfile({ userId: req.user.id, email: req.user.email });
+            await newProfile.save();
+            return res.json({
+                id: newProfile.userId,
+                email: newProfile.email,
+                fullName: newProfile.fullName,
+                avatar: newProfile.avatar,
+                watchlist: newProfile.watchlist
+            });
+        }
+        res.json({
+            id: profile.userId,
+            email: profile.email,
+            fullName: profile.fullName,
+            avatar: profile.avatar,
+            watchlist: profile.watchlist
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.patch('/profile', verifyToken, async (req, res) => {
+    try {
+        const { fullName, avatar } = req.body;
+        const profile = await UserProfile.findOneAndUpdate(
+            { userId: req.user.id },
+            { fullName, avatar },
+            { new: true, upsert: true }
+        );
+        res.json({
+            id: profile.userId,
+            email: profile.email,
+            fullName: profile.fullName,
+            avatar: profile.avatar,
+            watchlist: profile.watchlist
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.post('/watchlist', verifyToken, async (req, res) => {
+    try {
+        const { tmdbId, type } = req.body;
+        if (!tmdbId || !type) return res.status(400).json({ error: 'tmdbId and type required' });
+
+        const profile = await UserProfile.findOne({ userId: req.user.id });
+        if (!profile) return res.status(404).json({ error: 'Profile not found' });
+
+        // Check if already in watchlist
+        const exists = profile.watchlist.some(item => item.tmdbId === tmdbId && item.type === type);
+        if (exists) return res.status(409).json({ error: 'Already in watchlist' });
+
+        profile.watchlist.push({ tmdbId, type });
+        await profile.save();
+        res.status(201).json({ message: 'Added to watchlist' });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.delete('/watchlist/:tmdbId', verifyToken, async (req, res) => {
+    try {
+        const tmdbId = parseInt(req.params.tmdbId);
+        const profile = await UserProfile.findOne({ userId: req.user.id });
+        if (!profile) return res.status(404).json({ error: 'Profile not found' });
+
+        profile.watchlist = profile.watchlist.filter(item => item.tmdbId !== tmdbId);
+        await profile.save();
+        res.json({ message: 'Removed from watchlist' });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Swagger setup
+const swaggerOptions = {
+    definition: {
+        openapi: '3.0.0',
+        info: {
+            title: 'User Service API',
+            version: '1.0.0',
+            description: 'User profile and watchlist service for CineStream',
+        },
+        servers: [
+            {
+                url: 'http://localhost:4002',
+            },
+        ],
+    },
+    apis: ['./server.js'], // files containing annotations
+};
+
+const swaggerSpec = swaggerJSDoc(swaggerOptions);
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'User Service OK' });
 });
