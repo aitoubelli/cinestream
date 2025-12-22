@@ -6,8 +6,15 @@ const redis = require('redis');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const axios = require('axios');
+const mongoose = require('mongoose');
 
 dotenv.config();
+
+// MongoDB connection
+mongoose.connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+}).then(() => console.log('MongoDB connected')).catch(err => console.error('MongoDB connection error:', err));
 
 const app = express();
 const PORT = process.env.PORT || 4003;
@@ -20,6 +27,20 @@ app.use(express.json());
 // Redis client
 const redisClient = redis.createClient({ url: process.env.REDIS_URL });
 redisClient.connect().catch(console.error);
+
+// MongoDB schema and model
+const contentSchema = new mongoose.Schema({
+    tmdbId: { type: Number, required: true },
+    mediaType: { type: String, required: true, enum: ['movie', 'tv', 'person'] },
+    data: { type: Object, required: true },
+    enriched: { type: Object, default: {} },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+contentSchema.index({ tmdbId: 1, mediaType: 1 }, { unique: true });
+
+const Content = mongoose.model('Content', contentSchema);
 
 // TMDB API helper
 async function fetchFromTMDB(endpoint) {
@@ -188,6 +209,15 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.get('/movies/trending', async (req, res) => {
     try {
         const result = await getCachedOrFetch('tmdb:trending:movie:week', () => fetchFromTMDB('/trending/movie/week'));
+        if (!result.cached) {
+            for (const item of result.data.results) {
+                await Content.findOneAndUpdate(
+                    { tmdbId: item.id, mediaType: 'movie' },
+                    { data: item, updatedAt: new Date() },
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                );
+            }
+        }
         res.set('X-Cache-Status', result.cached ? 'HIT' : 'MISS');
         res.json(result.data);
     } catch (error) {
@@ -218,6 +248,15 @@ app.get('/movies/trending', async (req, res) => {
 app.get('/tv/trending', async (req, res) => {
     try {
         const result = await getCachedOrFetch('tmdb:trending:tv:week', () => fetchFromTMDB('/trending/tv/week'));
+        if (!result.cached) {
+            for (const item of result.data.results) {
+                await Content.findOneAndUpdate(
+                    { tmdbId: item.id, mediaType: 'tv' },
+                    { data: item, updatedAt: new Date() },
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                );
+            }
+        }
         res.set('X-Cache-Status', result.cached ? 'HIT' : 'MISS');
         res.json(result.data);
     } catch (error) {
@@ -263,6 +302,15 @@ app.get('/search', async (req, res) => {
     if (!q) return res.status(400).json({ error: 'Query parameter q is required' });
     try {
         const result = await getCachedOrFetch(`tmdb:search:multi:${q}`, () => fetchFromTMDB(`/search/multi?query=${encodeURIComponent(q)}`));
+        if (!result.cached) {
+            for (const item of result.data.results) {
+                await Content.findOneAndUpdate(
+                    { tmdbId: item.id, mediaType: item.media_type },
+                    { data: item, updatedAt: new Date() },
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                );
+            }
+        }
         res.set('X-Cache-Status', result.cached ? 'HIT' : 'MISS');
         res.json(result.data);
     } catch (error) {

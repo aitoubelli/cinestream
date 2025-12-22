@@ -11,7 +11,7 @@
 - [x] **API Gateway** routes `/api/auth/**`, `/api/user/**`, `/api/content/**` to respective services
 - [x] **Content Service** fetches data from TMDB API
 - [x] **Redis caching layer** for TMDB responses (TTL: 1 hour)
-- [ ] MongoDB storage for enriched content metadata (optional but recommended)
+- [x] MongoDB storage for enriched content metadata (optional but recommended)
 - [x] OpenAPI/Swagger docs on Content Service (`/docs`)
 - [x] End-to-end test: `GET /api/content/movies/trending` → returns cached or fresh TMDB data
 
