@@ -35,9 +35,9 @@
 
 ### API Gateway (`services/api-gateway`)
 
-- [ ] Install dependencies: `npm install express http-proxy-middleware`
+- [x] Install dependencies: `npm install express http-proxy-middleware`
 
-- [ ] Proxy configuration:
+- [x] Proxy configuration:
   ```js
   // routes.js
   const { createProxyMiddleware } = require('http-proxy-middleware');
@@ -58,14 +58,14 @@
   };
   ```
 
-- [ ] Server setup:
+- [x] Server setup:
   - Expose on port 3000
   - Add health check: `GET /health` → `{ status: 'API Gateway OK' }`
   - No authentication logic — pure routing
 
 ### Content Service (`services/content-service`)
 
-- [ ] Environment configuration:
+- [x] Environment configuration:
   ```env
   PORT=4003
   MONGO_URI=mongodb://mongodb:27017/cinestream_content
@@ -73,14 +73,14 @@
   TMDB_API_KEY=your_tmdb_v3_api_key_here
   ```
 
-- [ ] Redis client setup:
+- [x] Redis client setup:
   ```js
   const redis = require('redis');
   const client = redis.createClient({ url: process.env.REDIS_URL });
   client.connect();
   ```
 
-- [ ] TMDB API helper:
+- [x] TMDB API helper:
   ```js
   async function fetchFromTMDB(endpoint) {
     const url = `https://api.themoviedb.org/3${endpoint}?api_key=${process.env.TMDB_API_KEY}&language=en-US`;
@@ -89,7 +89,7 @@
   }
   ```
 
-- [ ] Caching logic:
+- [x] Caching logic:
   ```js
   async function getCachedOrFetch(key, fetchFn, ttl = 3600) {
     const cached = await client.get(key);
@@ -100,19 +100,19 @@
   }
   ```
 
-- [ ] Endpoints:
+- [x] Endpoints:
   - `GET /movies/trending` → fetch and cache `/trending/movie/week` from TMDB
   - `GET /tv/trending` → fetch and cache `/trending/tv/week` from TMDB
   - `GET /search?q=:query` → fetch and cache `/search/multi` from TMDB
 
-- [ ] Caching strategy:
+- [x] Caching strategy:
   - Use Redis keys like: `tmdb:trending:movie:week`
   - TTL: 3600 seconds (1 hour)
 
-- [ ] (Optional) MongoDB storage:
+- [x] (Optional) MongoDB storage:
   - Save enriched content metadata for future features (e.g., local ratings)
 
-- [ ] Swagger docs at `/docs`
+- [x] Swagger docs at `/docs`
 
 ### API Contract (Examples)
 
