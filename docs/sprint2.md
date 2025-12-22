@@ -35,70 +35,84 @@
 
 ### API Gateway (`services/api-gateway`)
 
-- [ ] Install: `npm install express http-proxy-middleware`
-- [ ] Proxy config:
+- [ ] Install dependencies: `npm install express http-proxy-middleware`
+
+- [ ] Proxy configuration:
   ```js
   // routes.js
   const { createProxyMiddleware } = require('http-proxy-middleware');
 
   module.exports = (app) => {
-    app.use('/api/auth', createProxyMiddleware({ target: 'http://auth-service:4001', changeOrigin: true }));
-    app.use('/api/user', createProxyMiddleware({ target: 'http://user-service:4002', changeOrigin: true }));
-    app.use('/api/content', createProxyMiddleware({ target: 'http://content-service:4003', changeOrigin: true }));
+    app.use('/api/auth', createProxyMiddleware({
+      target: 'http://auth-service:4001',
+      changeOrigin: true
+    }));
+    app.use('/api/user', createProxyMiddleware({
+      target: 'http://user-service:4002',
+      changeOrigin: true
+    }));
+    app.use('/api/content', createProxyMiddleware({
+      target: 'http://content-service:4003',
+      changeOrigin: true
+    }));
   };
+  ```
 
-  Expose on port 3000
-- Add health check: GET /health → { status: 'API Gateway OK' }
-- No auth logic — just routing
+- [ ] Server setup:
+  - Expose on port 3000
+  - Add health check: `GET /health` → `{ status: 'API Gateway OK' }`
+  - No authentication logic — pure routing
 
 ### Content Service (`services/content-service`)
-Environment:
 
-```env
-PORT=4003
-MONGO_URI=mongodb://mongodb:27017/cinestream_content
-REDIS_URL=redis://redis:6379
-TMDB_API_KEY=your_tmdb_v3_api_key_here
-```
+- [ ] Environment configuration:
+  ```env
+  PORT=4003
+  MONGO_URI=mongodb://mongodb:27017/cinestream_content
+  REDIS_URL=redis://redis:6379
+  TMDB_API_KEY=your_tmdb_v3_api_key_here
+  ```
 
-Redis client setup:
+- [ ] Redis client setup:
+  ```js
+  const redis = require('redis');
+  const client = redis.createClient({ url: process.env.REDIS_URL });
+  client.connect();
+  ```
 
-```js
-const redis = require('redis');
-const client = redis.createClient({ url: process.env.REDIS_URL });
-client.connect();
-```
+- [ ] TMDB API helper:
+  ```js
+  async function fetchFromTMDB(endpoint) {
+    const url = `https://api.themoviedb.org/3${endpoint}?api_key=${process.env.TMDB_API_KEY}&language=en-US`;
+    const res = await axios.get(url);
+    return res.data;
+  }
+  ```
 
-TMDB helper:
+- [ ] Caching logic:
+  ```js
+  async function getCachedOrFetch(key, fetchFn, ttl = 3600) {
+    const cached = await client.get(key);
+    if (cached) return JSON.parse(cached);
+    const data = await fetchFn();
+    await client.setEx(key, ttl, JSON.stringify(data));
+    return data;
+  }
+  ```
 
-```js
-async function fetchFromTMDB(endpoint) {
-  const url = `https://api.themoviedb.org/3${endpoint}?api_key=${process.env.TMDB_API_KEY}&language=en-US`;
-  const res = await axios.get(url);
-  return res.data;
-}
-```
+- [ ] Endpoints:
+  - `GET /movies/trending` → fetch and cache `/trending/movie/week` from TMDB
+  - `GET /tv/trending` → fetch and cache `/trending/tv/week` from TMDB
+  - `GET /search?q=:query` → fetch and cache `/search/multi` from TMDB
 
-Caching logic:
+- [ ] Caching strategy:
+  - Use Redis keys like: `tmdb:trending:movie:week`
+  - TTL: 3600 seconds (1 hour)
 
-```js
-async function getCachedOrFetch(key, fetchFn, ttl = 3600) {
-  const cached = await client.get(key);
-  if (cached) return JSON.parse(cached);
-  const data = await fetchFn();
-  await client.setEx(key, ttl, JSON.stringify(data));
-  return data;
-}
-```
+- [ ] (Optional) MongoDB storage:
+  - Save enriched content metadata for future features (e.g., local ratings)
 
-Endpoints:
-
-- GET /movies/trending → proxy to /trending/movie/week
-- GET /tv/trending → /trending/tv/week
-- GET /search?q=:query → /search/multi
-- Use cache keys like: `tmdb:trending:movie:week`
-- (Optional) Save to MongoDB for future enrichment (e.g., local ratings)
-- Swagger docs at `/docs`
+- [ ] Swagger docs at `/docs`
 
 ### API Contract (Examples)
 
@@ -124,24 +138,24 @@ GET http://localhost:3000/api/content/search?q=spider
 
 #### API Gateway
 
-- GET http://localhost:3000/api/auth/health → Auth Service response
-- GET http://localhost:3000/api/user/health → User Service
-- GET http://localhost:3000/api/content/movies/trending → Content data
+- [ ] GET http://localhost:3000/api/auth/health → Auth Service response
+- [ ] GET http://localhost:3000/api/user/health → User Service
+- [ ] GET http://localhost:3000/api/content/movies/trending → Content data
 
 #### Content Service
 
-- First call to /movies/trending → hits TMDB
-- Second call (within 1h) → served from Redis (check logs or add cache hit/miss header)
-- Swagger UI at http://localhost:4003/docs
-- Works without internet after first cache (optional test)
+- [ ] First call to /movies/trending → hits TMDB
+- [ ] Second call (within 1h) → served from Redis (check logs or add cache hit/miss header)
+- [ ] Swagger UI at http://localhost:4003/docs
+- [ ] Works without internet after first cache (optional test)
 
 #### Infrastructure
 
-- redis-cli shows keys like `tmdb:trending:movie:week`
-- TMDB API key not hardcoded — loaded from .env
-- No CORS issues (handled by frontend or gateway if needed)
+- [ ] redis-cli shows keys like `tmdb:trending:movie:week`
+- [ ] TMDB API key not hardcoded — loaded from .env
+- [ ] No CORS issues (handled by frontend or gateway if needed)
 
 #### Security
 
-- TMDB API key not committed (add .env to .gitignore)
-- Rate limiting not required yet (TMDB allows ~40 req/10s)
+- [ ] TMDB API key not committed (add .env to .gitignore)
+- [ ] Rate limiting not required yet (TMDB allows ~40 req/10s)
