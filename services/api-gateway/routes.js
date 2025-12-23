@@ -44,25 +44,9 @@ module.exports = (app) => {
         changeOrigin: true,
         pathRewrite: { '^/api/content': '' }
     }));
-    app.use('/api/movies', createProxyMiddleware({
-        target: 'http://localhost:4003',
-        changeOrigin: true,
-        pathRewrite: { '^/api': '' }
-    }));
-    app.use('/api/series', createProxyMiddleware({
-        target: 'http://localhost:4003',
-        changeOrigin: true,
-        pathRewrite: { '^/api': '' }
-    }));
-    app.use('/api/browse', createProxyMiddleware({
-        target: 'http://localhost:4003',
-        changeOrigin: true,
-        pathRewrite: { '^/api': '' }
-    }));
-    app.use('/api/featured', createProxyMiddleware({
-        target: 'http://localhost:4003',
-        changeOrigin: true,
-        pathRewrite: { '^/api': '' }
+    app.use('/api/interactions', createProxyMiddleware({
+        target: 'http://localhost:4004',
+        changeOrigin: true
     }));
     app.use('/api/notifications', createProxyMiddleware({
         target: 'http://localhost:4005',
