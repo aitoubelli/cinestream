@@ -12,7 +12,7 @@ interface ProfileData {
 }
 
 interface AuthContextType {
-  user: any | null; // Simplified user object
+  user: any | null;
   userRole: 'user' | 'admin' | null;
   profileData: ProfileData | null;
   loading: boolean;
@@ -83,6 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
       console.log('Fetch completed, response status:', response.status, 'ok:', response.ok);
@@ -146,7 +147,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const logout = async () => {
     try {
-      // Call logout endpoint if needed, or just clear local state
+      await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
       setUser(null);
       setUserRole(null);
       setProfileData(null);

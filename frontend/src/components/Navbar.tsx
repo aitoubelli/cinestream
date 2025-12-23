@@ -146,7 +146,7 @@ export function Navbar() {
                 />
               </div>
               <span className="text-xl bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent">
-                Cineova
+                Cinestream
               </span>
             </motion.div>
           </Link>

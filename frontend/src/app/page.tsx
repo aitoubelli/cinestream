@@ -75,20 +75,20 @@ export default function Home() {
   };
 
   const { data: trendingData, error: trendingError, isLoading: trendingLoading } = useSWR(
-    activeCategory === 'movies' ? getApiUrl("/api/movies/trending?type=movie") :
-    getApiUrl("/api/series/trending?type=tv"),
+    activeCategory === 'movies' ? getApiUrl("/api/content/movies/trending") :
+    getApiUrl("/api/content/series/trending"),
     fetcher,
   );
 
   const { data: popularData, error: popularError, isLoading: popularLoading } = useSWR(
-    activeCategory === 'movies' ? getApiUrl("/api/movies/popular?type=movie") :
-    getApiUrl("/api/series/popular?type=tv"),
+    activeCategory === 'movies' ? getApiUrl("/api/content/movies/popular") :
+    getApiUrl("/api/content/series/popular"),
     fetcher,
   );
 
   // Fetch popular movies for the current category (replaces static featured movies)
   const { data: featuredMoviesData, error: featuredMoviesError, isLoading: featuredMoviesLoading } = useSWR(
-    getApiUrl(`/api/featured/popular/${activeCategory}`),
+    getApiUrl(`/api/content/featured/popular/${activeCategory}`),
     fetcher,
   );
 
@@ -106,8 +106,8 @@ export default function Home() {
 
   // Fetch newest releases
   const { data: newestData, error: newestError, isLoading: newestLoading } = useSWR(
-    activeCategory === 'movies' ? getApiUrl("/api/movies/now-playing?type=movie") :
-    getApiUrl("/api/series/popular?type=tv"),
+    activeCategory === 'movies' ? getApiUrl("/api/content/movies/now-playing") :
+    getApiUrl("/api/content/tv/on-the-air"),
     fetcher,
   );
 

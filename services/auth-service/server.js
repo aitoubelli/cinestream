@@ -412,36 +412,58 @@ app.get('/api/auth/profile', async (req, res) => {
 });
 
 /**
-  * @swagger
-  * /profile:
-  *   put:
-  *     summary: Update user profile
-  *     tags: [Auth]
-  *     security:
-  *       - bearerAuth: []
-  *     requestBody:
-  *       required: true
-  *       content:
-  *         application/json:
-  *           schema:
-  *             type: object
-  *             properties:
-  *               username:
-  *                 type: string
-  *               name:
-  *                 type: string
-  *               avatar:
-  *                 type: number
-  *     responses:
-  *       200:
-  *         description: Profile updated successfully
-  *       400:
-  *         description: Bad request
-  *       401:
-  *         description: Unauthorized
-  *       500:
-  *         description: Internal server error
-  */
+   * @swagger
+   * /logout:
+   *   post:
+   *     summary: Logout user
+   *     tags: [Auth]
+   *     responses:
+   *       200:
+   *         description: Logout successful
+   *       500:
+   *         description: Internal server error
+   */
+app.post('/api/auth/logout', async (req, res) => {
+    try {
+        // Clear the auth cookie
+        res.clearCookie('auth', { httpOnly: true, secure: false, sameSite: 'lax' });
+        res.json({ message: 'Logout successful' });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+   * @swagger
+   * /profile:
+   *   put:
+   *     summary: Update user profile
+   *     tags: [Auth]
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               username:
+   *                 type: string
+   *               name:
+   *                 type: string
+   *               avatar:
+   *                 type: number
+   *     responses:
+   *       200:
+   *         description: Profile updated successfully
+   *       400:
+   *         description: Bad request
+   *       401:
+   *         description: Unauthorized
+   *       500:
+   *         description: Internal server error
+   */
 app.put('/api/auth/profile', verifyToken, async (req, res) => {
     try {
         const { username, name, avatar } = req.body;

@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cineova",
+  title: "Cinestream",
   description: "Discover and explore movies and TV shows",
 };
 
