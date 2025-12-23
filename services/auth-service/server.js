@@ -245,36 +245,36 @@ app.post('/refresh', async (req, res) => {
 });
 
 /**
- * @swagger
- * /verify:
- *   post:
- *     summary: Verify access token
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - token
- *             properties:
- *               token:
- *                 type: string
- *     responses:
- *       200:
- *         description: Token verified successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/VerifyResponse'
- *       400:
- *         description: Bad request - Token required
- *       401:
- *         description: Invalid token
- *       500:
- *         description: Internal server error
- */
+  * @swagger
+  * /verify:
+  *   post:
+  *     summary: Verify access token
+  *     tags: [Auth]
+  *     requestBody:
+  *       required: true
+  *       content:
+  *         application/json:
+  *           schema:
+  *             type: object
+  *             required:
+  *               - token
+  *             properties:
+  *               token:
+  *                 type: string
+  *     responses:
+  *       200:
+  *         description: Token verified successfully
+  *         content:
+  *           application/json:
+  *             schema:
+  *               $ref: '#/components/schemas/VerifyResponse'
+  *       400:
+  *         description: Bad request - Token required
+  *       401:
+  *         description: Invalid token
+  *       500:
+  *         description: Internal server error
+  */
 app.post('/verify', async (req, res) => {
     try {
         const { token } = req.body;
@@ -287,6 +287,67 @@ app.post('/verify', async (req, res) => {
             if (!user) return res.status(401).json({ error: 'User not found' });
 
             res.json({ user: { id: user._id, email: user.email, role: user.role } });
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * @swagger
+ * /profile:
+ *   get:
+ *     summary: Get user profile
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 uid:
+ *                   type: string
+ *                 email:
+ *                   type: string
+ *                 username:
+ *                   type: string
+ *                 name:
+ *                   type: string
+ *                 avatar:
+ *                   type: number
+ *                 role:
+ *                   type: string
+ *                   enum: [user, admin]
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
+app.get('/profile', async (req, res) => {
+    try {
+        // For now, get token from cookie (since auth-service sets it)
+        const token = req.cookies.auth;
+        if (!token) return res.status(401).json({ error: 'No token provided' });
+
+        jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
+            if (err) return res.status(401).json({ error: 'Invalid token' });
+
+            const user = await User.findById(decoded.id);
+            if (!user) return res.status(401).json({ error: 'User not found' });
+
+            // Return profile in the format expected by frontend
+            res.json({
+                uid: user._id.toString(),
+                email: user.email,
+                username: user.email.split('@')[0], // Simple username from email
+                name: user.email.split('@')[0], // Simple name from email
+                avatar: 0, // Default avatar
+                role: user.role
+            });
         });
     } catch (err) {
         res.status(500).json({ error: 'Internal server error' });
