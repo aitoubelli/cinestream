@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
 const swaggerJSDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const dotenv = require('dotenv');
@@ -13,8 +14,13 @@ const app = express();
 const PORT = process.env.PORT || 4001;
 
 // Middleware
+app.use((req, res, next) => {
+    console.log(`Auth Service: ${req.method} ${req.url} from ${req.ip}`);
+    next();
+});
 app.use(helmet());
 app.use(express.json());
+app.use(cookieParser());
 
 // MongoDB connection
 mongoose.connect(process.env.MONGO_URI, {
@@ -27,6 +33,9 @@ mongoose.connect(process.env.MONGO_URI, {
 const userSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true },
     passwordHash: { type: String, required: true },
+    username: { type: String, default: '' },
+    name: { type: String, default: '' },
+    avatar: { type: Number, default: 0, min: 0, max: 19 },
     role: { type: String, enum: ['user', 'admin'], default: 'user' },
     createdAt: { type: Date, default: Date.now }
 });
@@ -47,6 +56,17 @@ const generateAccessToken = (user) => {
 
 const generateRefreshToken = (user) => {
     return jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+};
+
+// Middleware
+const verifyToken = (req, res, next) => {
+    const token = req.headers.authorization?.split(' ')[1] || req.cookies.auth;
+    if (!token) return res.status(401).json({ error: 'No token provided' });
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+        if (err) return res.status(401).json({ error: 'Invalid token' });
+        req.user = decoded;
+        next();
+    });
 };
 
 // Routes
@@ -87,16 +107,19 @@ const generateRefreshToken = (user) => {
  *       500:
  *         description: Internal server error
  */
-app.post('/register', async (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
+    console.log('Auth service: Register request received at', new Date().toISOString());
+    console.log('Request body:', req.body);
     try {
-        const { email, password } = req.body;
+        const { email, password, name } = req.body;
+        console.log('Email:', email, 'Password provided:', !!password, 'Name:', name);
         if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
         const existingUser = await User.findOne({ email });
         if (existingUser) return res.status(409).json({ error: 'User already exists' });
 
         const passwordHash = await bcrypt.hash(password, 10);
-        const user = new User({ email, passwordHash });
+        const user = new User({ email, passwordHash, name });
         await user.save();
 
         const accessToken = generateAccessToken(user);
@@ -154,34 +177,60 @@ app.post('/register', async (req, res) => {
 *       500:
 *         description: Internal server error
 */
-app.post('/login', async (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
+    console.log('Login route hit');
+    console.log('Auth service: Login request received at', new Date().toISOString());
+    console.log('Request body:', req.body);
     try {
         const { email, password } = req.body;
+        console.log('Email:', email, 'Password provided:', !!password);
         if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
+        console.log('Finding user in database...');
         const user = await User.findOne({ email });
-        if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+        console.log('User found:', !!user);
+
+        if (!user) {
+            console.log('User not found');
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
+        console.log('Comparing password...');
+        // Temporarily log password comparison for debugging
+        console.log('Input password:', password);
+        console.log('Stored hash:', user.passwordHash);
+        const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+        console.log('Password comparison result:', isPasswordValid);
+
+        if (!isPasswordValid) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        console.log('Generating access token...');
         const accessToken = generateAccessToken(user);
+        console.log('Generating refresh token...');
         const refreshToken = generateRefreshToken(user);
 
+        console.log('Removing old refresh tokens...');
         // Remove old refresh tokens for user
         await RefreshToken.deleteMany({ userId: user._id });
 
+        console.log('Creating new refresh token document...');
         const refreshTokenDoc = new RefreshToken({
             token: refreshToken,
             userId: user._id,
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
         });
         await refreshTokenDoc.save();
+        console.log('Refresh token saved.');
 
         // Set httpOnly cookie
         res.cookie('auth', accessToken, { httpOnly: true, secure: false, sameSite: 'lax' });
 
+        console.log('Login successful for user:', user.email);
         res.json({ message: 'Login successful' });
     } catch (err) {
+        console.error('Login error:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -220,7 +269,7 @@ app.post('/login', async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-app.post('/refresh', async (req, res) => {
+app.post('/api/auth/refresh', async (req, res) => {
     try {
         const { refreshToken } = req.body;
         if (!refreshToken) return res.status(400).json({ error: 'Refresh token required' });
@@ -275,7 +324,7 @@ app.post('/refresh', async (req, res) => {
   *       500:
   *         description: Internal server error
   */
-app.post('/verify', async (req, res) => {
+app.post('/api/auth/verify', async (req, res) => {
     try {
         const { token } = req.body;
         if (!token) return res.status(400).json({ error: 'Token required' });
@@ -294,60 +343,125 @@ app.post('/verify', async (req, res) => {
 });
 
 /**
- * @swagger
- * /profile:
- *   get:
- *     summary: Get user profile
- *     tags: [Auth]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: User profile retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 uid:
- *                   type: string
- *                 email:
- *                   type: string
- *                 username:
- *                   type: string
- *                 name:
- *                   type: string
- *                 avatar:
- *                   type: number
- *                 role:
- *                   type: string
- *                   enum: [user, admin]
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Internal server error
- */
-app.get('/profile', async (req, res) => {
+  * @swagger
+  * /profile:
+  *   get:
+  *     summary: Get user profile
+  *     tags: [Auth]
+  *     security:
+  *       - bearerAuth: []
+  *     responses:
+  *       200:
+  *         description: User profile retrieved successfully
+  *         content:
+  *           application/json:
+  *             schema:
+  *               type: object
+  *               properties:
+  *                 uid:
+  *                   type: string
+  *                 email:
+  *                   type: string
+  *                 username:
+  *                   type: string
+  *                 name:
+  *                   type: string
+  *                 avatar:
+  *                   type: number
+  *                 role:
+  *                   type: string
+  *                   enum: [user, admin]
+  *       401:
+  *         description: Unauthorized
+  *       500:
+  *         description: Internal server error
+  */
+app.get('/api/auth/profile', async (req, res) => {
+    console.log('Profile request received');
     try {
         // For now, get token from cookie (since auth-service sets it)
         const token = req.cookies.auth;
+        console.log('Token:', token ? 'present' : 'missing');
         if (!token) return res.status(401).json({ error: 'No token provided' });
 
         jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
+            console.log('JWT verify err:', err);
             if (err) return res.status(401).json({ error: 'Invalid token' });
 
+            console.log('Decoded id:', decoded.id);
             const user = await User.findById(decoded.id);
+            console.log('User found:', !!user);
             if (!user) return res.status(401).json({ error: 'User not found' });
 
             // Return profile in the format expected by frontend
-            res.json({
+            const profile = {
                 uid: user._id.toString(),
                 email: user.email,
-                username: user.email.split('@')[0], // Simple username from email
-                name: user.email.split('@')[0], // Simple name from email
-                avatar: 0, // Default avatar
+                username: user.username || '',
+                name: user.name || '',
+                avatar: user.avatar || 0,
                 role: user.role
-            });
+            };
+            console.log('Returning profile:', profile);
+            res.json(profile);
+        });
+    } catch (err) {
+        console.error('Profile error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+  * @swagger
+  * /profile:
+  *   put:
+  *     summary: Update user profile
+  *     tags: [Auth]
+  *     security:
+  *       - bearerAuth: []
+  *     requestBody:
+  *       required: true
+  *       content:
+  *         application/json:
+  *           schema:
+  *             type: object
+  *             properties:
+  *               username:
+  *                 type: string
+  *               name:
+  *                 type: string
+  *               avatar:
+  *                 type: number
+  *     responses:
+  *       200:
+  *         description: Profile updated successfully
+  *       400:
+  *         description: Bad request
+  *       401:
+  *         description: Unauthorized
+  *       500:
+  *         description: Internal server error
+  */
+app.put('/api/auth/profile', verifyToken, async (req, res) => {
+    try {
+        const { username, name, avatar } = req.body;
+        const userId = req.user.id;
+
+        const updateData = {};
+        if (username !== undefined) updateData.username = username;
+        if (name !== undefined) updateData.name = name;
+        if (avatar !== undefined) updateData.avatar = avatar;
+
+        const user = await User.findByIdAndUpdate(userId, updateData, { new: true });
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        res.json({
+            uid: user._id.toString(),
+            email: user.email,
+            username: user.username || '',
+            name: user.name || '',
+            avatar: user.avatar || 0,
+            role: user.role
         });
     } catch (err) {
         res.status(500).json({ error: 'Internal server error' });

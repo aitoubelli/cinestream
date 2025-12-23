@@ -1,103 +1,115 @@
-// frontend/src/app/dashboard/page.tsx
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { TrendingUp, Clock } from 'lucide-react';
-import { ContentCard } from '@/components/ContentCard';
-import { getTrending, getWatchlist } from '@/lib/api';
-import { useAuth } from '@/hooks/useAuth';
-import { redirect } from 'next/navigation';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
-interface Content {
-  id: number;
-  type: 'movie' | 'tv';
-  title: string;
-  description: string;
-  year: number;
-  rating: number;
-  posterUrl: string;
+interface DashboardData {
+  message: string;
+  user: {
+    uid: string;
+    email: string;
+  };
 }
 
-export default function DashboardPage() {
-  const { user, isLoading } = useAuth();
-  const [trending, setTrending] = useState<Content[]>([]);
-  const [watchlist, setWatchlist] = useState<Content[]>([]);
-  const [isLoadingContent, setIsLoadingContent] = useState(true);
+export default function Dashboard() {
+  const { user, loading, logout } = useAuth();
+  const router = useRouter();
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [error, setError] = useState<string>("");
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      redirect('/auth/login');
+    if (!loading && !user) {
+      router.push("/");
+      return;
     }
-  }, [user, isLoading]);
 
-  useEffect(() => {
     if (user) {
-      loadContent();
+      fetchDashboardData();
     }
-  }, [user]);
+  }, [user, loading, router]);
 
-  const loadContent = async () => {
+  const fetchDashboardData = async () => {
+    if (!user) return;
+
     try {
-      const [trendingData, watchlistData] = await Promise.all([
-        getTrending(),
-        getWatchlist(),
-      ]);
-      setTrending(trendingData);
-      setWatchlist(watchlistData);
-    } catch (error) {
-      console.error('Error loading content:', error);
-    } finally {
-      setIsLoadingContent(false);
+      const token = await user.getIdToken();
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/dashboard`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch dashboard data");
+      }
+
+      const data: DashboardData = await response.json();
+      setDashboardData(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
     }
   };
 
-  if (isLoading || isLoadingContent) {
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push("/");
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div>Loading...</div>
       </div>
     );
   }
 
-  return (
-    <div className="space-y-8">
-      {/* Section Tendances */}
-      <section>
-        <div className="flex items-center gap-2 mb-4">
-          <TrendingUp className="h-6 w-6" />
-          <h2 className="text-2xl font-bold">Tendances actuelles</h2>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {trending.map((content) => (
-            <ContentCard key={`${content.type}-${content.id}`} {...content} />
-          ))}
-        </div>
-      </section>
+  if (!user) {
+    return null; // Will redirect in useEffect
+  }
 
-      {/* Section Watchlist */}
-      <section>
-        <div className="flex items-center gap-2 mb-4">
-          <Clock className="h-6 w-6" />
-          <h2 className="text-2xl font-bold">Ma watchlist</h2>
-        </div>
-        {watchlist.length === 0 ? (
-          <div className="text-center py-12 border rounded-lg">
-            <p className="text-muted-foreground">
-              Votre watchlist est vide. Ajoutez des films ou séries !
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {watchlist.map((content) => (
-              <ContentCard
-                key={`${content.type}-${content.id}`}
-                {...content}
-                onWatchlist={true}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+  return (
+    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md mx-auto">
+        <Card>
+          <CardHeader>
+            <CardTitle>Dashboard</CardTitle>
+            <CardDescription>
+              Welcome to your protected dashboard
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {dashboardData ? (
+              <div className="space-y-2">
+                <p className="text-green-600 font-medium">
+                  {dashboardData.message}
+                </p>
+                <p className="text-sm text-gray-600">
+                  Email: {dashboardData.user.email}
+                </p>
+              </div>
+            ) : error ? (
+              <p className="text-red-600">{error}</p>
+            ) : (
+              <p>Loading dashboard data...</p>
+            )}
+
+            <Button
+              onClick={handleLogout}
+              variant="outline"
+              className="w-full"
+            >
+              Logout
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

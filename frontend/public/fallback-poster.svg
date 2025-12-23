@@ -1,0 +1,16 @@
+<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 750" width="500" height="750">
+	<defs>
+		<linearGradient id="g1" x2="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(500,750,-692.308,461.538,0,0)">
+			<stop offset="0" stop-color="#6b7280"/>
+			<stop offset="1" stop-color="#374151"/>
+		</linearGradient>
+		<image width="192" height="192" id="img1" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNHB4IiBoZWlnaHQ9IjI0cHgiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDBEM0YyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgY2xhc3M9Imx1Y2lkZSBsdWNpZGUtZmlsbS1pY29uIGx1Y2lkZS1maWxtIiBkYXRhLW9yaWdpbmFsc3Ryb2tlY29sb3I9IiM5YjFmZTgiIHRyYW5zZm9ybT0icm90YXRlKDApIHNjYWxlKDEsIDEpIj48cmVjdCB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHg9IjMiIHk9IjMiIHJ4PSIyIi8+PHBhdGggZD0iTTcgM3YxOCIvPjxwYXRoIGQ9Ik0zIDcuNWg0Ii8+PHBhdGggZD0iTTMgMTJoMTgiLz48cGF0aCBkPSJNMyAxNi41aDQiLz48cGF0aCBkPSJNMTcgM3YxOCIvPjxwYXRoIGQ9Ik0xNyA3LjVoNCIvPjxwYXRoIGQ9Ik0xNyAxNi41aDQiLz48L3N2Zz4="/>
+	</defs>
+	<style>
+		.s0 { fill: url(#g1) } 
+	</style>
+	<g>
+		<path id="svg_2" fill-rule="evenodd" class="s0" d="m0 0h500v750h-500z"/>
+		<use id="film-colored" href="#img1" transform="matrix(1.375,0,0,1.375,118,243)"/>
+	</g>
+</svg>
