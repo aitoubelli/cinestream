@@ -108,7 +108,11 @@ app.post('/register', async (req, res) => {
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
         });
         await refreshTokenDoc.save();
-        res.status(201).json({ accessToken, refreshToken });
+
+        // Set httpOnly cookie
+        res.cookie('auth', accessToken, { httpOnly: true, secure: false, sameSite: 'lax' });
+
+        res.status(201).json({ message: 'User registered successfully' });
     } catch (err) {
         res.status(500).json({ error: 'Internal server error' });
     }
@@ -173,7 +177,10 @@ app.post('/login', async (req, res) => {
         });
         await refreshTokenDoc.save();
 
-        res.json({ accessToken, refreshToken });
+        // Set httpOnly cookie
+        res.cookie('auth', accessToken, { httpOnly: true, secure: false, sameSite: 'lax' });
+
+        res.json({ message: 'Login successful' });
     } catch (err) {
         res.status(500).json({ error: 'Internal server error' });
     }
