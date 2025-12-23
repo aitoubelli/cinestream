@@ -15,6 +15,10 @@ module.exports = (app) => {
         changeOrigin: true,
         pathRewrite: { '^/api/content': '' }
     }));
+    app.use('/api/interactions', createProxyMiddleware({
+        target: 'http://localhost:4004',
+        changeOrigin: true
+    }));
     app.use('/api/notifications', createProxyMiddleware({
         target: 'http://localhost:4005',
         changeOrigin: true,

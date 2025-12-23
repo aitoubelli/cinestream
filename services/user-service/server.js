@@ -378,6 +378,25 @@ const swaggerOptions = {
 const swaggerSpec = swaggerJSDoc(swaggerOptions);
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+// Internal endpoint for service-to-service communication (no auth required)
+app.get('/internal/users-by-watchlist', async (req, res) => {
+    try {
+        const { tmdbId, type } = req.query;
+        if (!tmdbId || !type) return res.status(400).json({ error: 'tmdbId and type required' });
+
+        const profiles = await UserProfile.find({
+            watchlist: {
+                $elemMatch: { tmdbId: parseInt(tmdbId), type }
+            }
+        });
+
+        const userIds = profiles.map(profile => profile.userId.toString());
+        res.json({ userIds });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'User Service OK' });
