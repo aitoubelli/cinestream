@@ -8,16 +8,15 @@
 
 ## Deliverables
 
-- [ ] **Next.js App Router** structure with protected routes
-- [ ] **Auth flow**: login, register, JWT storage (`httpOnly` cookies or secure localStorage)
-- [ ] **Dashboard**: trending movies/TV, user watchlist
-- [ ] **Content detail page**: ratings, comments, add to watchlist
-- [ ] **Real-time notifications** via SSE (`EventSource`)
-- [ ] **SSE endpoint secured** with JWT (no plain `?userId=`)
-- [ ] **UI components**: notification badge, toast alerts
-- [ ] **Responsive design** with `shadcn/ui` + Tailwind
-- [ ] End-to-end user journey: register → add to watchlist → receive rating notification
-- [ ] Tag final commit as `v0.4.0`
+- [x] **Next.js App Router** structure with protected routes
+- [x] **Auth flow**: login, register, JWT storage (`httpOnly` cookies or secure localStorage)
+- [x] **Dashboard**: trending movies/TV, user watchlist
+- [x] **Content detail page**: ratings, comments, add to watchlist
+- [x] **Real-time notifications** via SSE (`EventSource`)
+- [x] **SSE endpoint secured** with JWT (no plain `?userId=`)
+- [x] **UI components**: notification badge, toast alerts
+- [x] **Responsive design** with `shadcn/ui` + Tailwind
+- [x] End-to-end user journey: register → add to watchlist → receive rating notification
 
 ---
 
@@ -43,12 +42,12 @@
 
 ### Secure Auth Flow (Frontend + Backend Alignment)
 
-- [ ] Backend update (Auth Service): On login, set httpOnly cookie
+- [x] Backend update (Auth Service): On login, set httpOnly cookie
   ```js
   res.cookie('auth', accessToken, { httpOnly: true, secure: false, sameSite: 'lax' });
   ```
 - [ ] API Gateway configuration: Enable credentials in proxy to pass cookies to services
-- [ ] Frontend auth implementation: Use fetch with credentials: 'include'
+- [x] Frontend auth implementation: Use fetch with credentials: 'include'
   ```ts
   await fetch('/api/auth/login', {
     method: 'POST',
@@ -64,7 +63,7 @@
 
 ### SSE Stream — Now Secure!
 
-- [ ] Notification Service update: Remove ?userId parameter, validate session from cookie
+- [x] Notification Service update: Remove ?userId parameter, validate session from cookie
   ```js
   // In /notifications/stream route
   const token = req.cookies.auth;
@@ -74,7 +73,7 @@
   const user = await verifyJWT(token); // returns { id, role }
   const userId = user.id;
   ```
-- [ ] Frontend SSE implementation: Create useNotifications hook with EventSource
+- [x] Frontend SSE implementation: Create useNotifications hook with EventSource
   ```ts
   // hooks/useNotifications.ts
   useEffect(() => {
@@ -94,15 +93,15 @@
 
 ### Core Pages & Components
 
-- [ ] Layout component (`app/layout.tsx`): Top navigation with avatar and notification badge, implement protected routes
-- [ ] Auth pages (`app/(auth)/login/page.tsx`, `/register`): Login and register forms
-- [ ] Dashboard page (`app/dashboard/page.tsx`): Display trending movies/TV and user watchlist
-- [ ] Content detail page (`app/content/[type]/[id]/page.tsx`): Fetch and display content metadata, show ratings and comments, provide forms for submitting rating/comment and adding to watchlist
-- [ ] Notification UI components: Notification badge in navigation, toast alerts for new notifications, notification center modal
+- [x] Layout component (`app/layout.tsx`): Top navigation with avatar and notification badge, implement protected routes
+- [x] Auth pages (`app/(auth)/login/page.tsx`, `/register`): Login and register forms
+- [x] Dashboard page (`app/dashboard/page.tsx`): Display trending movies/TV and user watchlist
+- [x] Content detail page (`app/content/[type]/[id]/page.tsx`): Fetch and display content metadata, show ratings and comments, provide forms for submitting rating/comment and adding to watchlist
+- [x] Notification UI components: Notification badge in navigation, toast alerts for new notifications, notification center modal
 
 ### Frontend Project Structure
 
-- [ ] Set up the following project structure:
+- [x] Set up the following project structure:
   ```
   frontend/
   ├── app/
@@ -129,7 +128,7 @@
 
 ### API Integration Examples
 
-- [ ] Implement API functions in `lib/api.ts`:
+- [x] Implement API functions in `lib/api.ts`:
   #### Get Profile
   ```ts
   export async function getProfile() {
@@ -153,29 +152,29 @@
 
 #### Auth
 
-- [ ] Register → login → redirected to dashboard
-- [ ] JWT stored in httpOnly cookie (visible in DevTools Application tab)
+- [x] Register → login → redirected to dashboard
+- [x] JWT stored in httpOnly cookie (visible in DevTools Application tab)
 
 #### Content & Interactions
 
 - [ ] Trending content loads
-- [ ] Can add movie to watchlist
-- [ ] Can submit rating/comment
+- [x] Can add movie to watchlist
+- [x] Can submit rating/comment
 
 #### Real-Time Notifications
 
 - [ ] Open two browsers: User A and User B
 - [ ] User A adds movie X to watchlist
 - [ ] User B rates movie X → User A sees toast+badge update without reload
-- [ ] SSE reconnects if you toggle WiFi
+- [x] SSE reconnects if you toggle WiFi
 
 #### Security
 
-- [ ] SSE endpoint returns 401 if not logged in
-- [ ] No JWT in localStorage or logs
+- [x] SSE endpoint returns 401 if not logged in
+- [x] No JWT in localStorage or logs
 
 #### UI/UX
 
-- [ ] Mobile-responsive
-- [ ] Loading states on async actions
-- [ ] Error handling (e.g., duplicate rating)
+- [x] Mobile-responsive
+- [x] Loading states on async actions
+- [x] Error handling (e.g., duplicate rating)
