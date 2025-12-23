@@ -88,6 +88,7 @@ export function Navbar() {
     try {
       await logout();
       setIsProfileMenuOpen(false);
+      router.push('/');
     } catch (error) {
       console.error('Error logging out:', error);
     }

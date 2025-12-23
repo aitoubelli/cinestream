@@ -135,8 +135,27 @@ export function ProfilePage() {
     setIsChangingPassword(true);
 
     try {
-      // TODO: Implement change password functionality
-      setPasswordError('Password change not implemented yet');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to change password');
+      }
+
+      setPasswordSuccess('Password changed successfully!');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to change password';
       setPasswordError(errorMessage);

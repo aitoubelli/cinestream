@@ -484,24 +484,45 @@ app.post('/api/auth/logout', async (req, res) => {
    */
 app.put('/api/auth/profile', verifyToken, async (req, res) => {
     try {
-        const { username, name, avatar } = req.body;
+        const { username, name, avatar, currentPassword, newPassword } = req.body;
         const userId = req.user.id;
+
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
 
         const updateData = {};
         if (username !== undefined) updateData.username = username;
         if (name !== undefined) updateData.name = name;
         if (avatar !== undefined) updateData.avatar = avatar;
 
-        const user = await User.findByIdAndUpdate(userId, updateData, { new: true });
-        if (!user) return res.status(404).json({ error: 'User not found' });
+        // Handle password change
+        if (newPassword) {
+            if (!currentPassword) {
+                return res.status(400).json({ error: 'Current password is required to change password' });
+            }
+            const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
+            if (!isCurrentPasswordValid) {
+                return res.status(401).json({ error: 'Current password is incorrect' });
+            }
+            if (newPassword.length < 6) {
+                return res.status(400).json({ error: 'New password must be at least 6 characters' });
+            }
+            updateData.passwordHash = await bcrypt.hash(newPassword, 10);
+
+            // Invalidate refresh tokens for security
+            await RefreshToken.deleteMany({ userId });
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(userId, updateData, { new: true });
+        if (!updatedUser) return res.status(404).json({ error: 'User not found' });
 
         res.json({
-            uid: user._id.toString(),
-            email: user.email,
-            username: user.username || '',
-            name: user.name || '',
-            avatar: user.avatar || 0,
-            role: user.role
+            uid: updatedUser._id.toString(),
+            email: updatedUser.email,
+            username: updatedUser.username || '',
+            name: updatedUser.name || '',
+            avatar: updatedUser.avatar || 0,
+            role: updatedUser.role
         });
     } catch (err) {
         res.status(500).json({ error: 'Internal server error' });
