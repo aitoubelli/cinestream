@@ -3,7 +3,6 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/hooks/useAuth';
-import { Toaster } from '@/components/ui/toaster';
 import { Navigation } from '@/components/Navigation';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -26,7 +25,6 @@ export default function RootLayout({
             <Navigation />
             <main className="container mx-auto px-4 py-8">{children}</main>
           </div>
-          <Toaster />
         </AuthProvider>
       </body>
     </html>

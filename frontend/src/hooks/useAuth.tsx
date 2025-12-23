@@ -1,4 +1,4 @@
-// frontend/src/hooks/useAuth.ts
+// frontend/src/hooks/useAuth.tsx
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await apiLogout();
     } finally {
       setUser(null);
-      window.location.href = '/login';
+      window.location.href = '/auth/login';
     }
   };
 

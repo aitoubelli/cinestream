@@ -2,7 +2,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const cors = require('cors');
 const helmet = require('helmet');
 const swaggerJSDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
@@ -15,7 +14,6 @@ const PORT = process.env.PORT || 4001;
 
 // Middleware
 app.use(helmet());
-app.use(cors());
 app.use(express.json());
 
 // MongoDB connection

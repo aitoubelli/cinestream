@@ -30,7 +30,7 @@ export function Navigation() {
           ) : (
             <div className="flex items-center gap-2">
               <Button variant="ghost" asChild>
-                <Link href="/login">Connexion</Link>
+                <Link href="/auth/login">Connexion</Link>
               </Button>
               <Button asChild>
                 <Link href="/register">Inscription</Link>

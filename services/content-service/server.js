@@ -1,6 +1,5 @@
 const express = require('express');
 const dotenv = require('dotenv');
-const cors = require('cors');
 const helmet = require('helmet');
 const redis = require('redis');
 const swaggerJsdoc = require('swagger-jsdoc');
@@ -20,7 +19,6 @@ const app = express();
 const PORT = process.env.PORT || 4003;
 
 // Middleware
-app.use(cors());
 app.use(helmet());
 app.use(express.json());
 

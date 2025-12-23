@@ -13,7 +13,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
 
   if (response.status === 401) {
     // Rediriger vers login si non authentifié
-    window.location.href = '/login';
+    window.location.href = '/auth/login';
     throw new Error('Unauthorized');
   }
 

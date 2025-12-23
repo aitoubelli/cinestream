@@ -26,7 +26,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!isLoading && !user) {
-      redirect('/login');
+      redirect('/auth/login');
     }
   }, [user, isLoading]);
 
