@@ -119,7 +119,25 @@ app.post('/api/auth/register', async (req, res) => {
         if (existingUser) return res.status(409).json({ error: 'User already exists' });
 
         const passwordHash = await bcrypt.hash(password, 10);
-        const user = new User({ email, passwordHash, name });
+
+        // Generate username from name if provided
+        let username = '';
+        if (name && name.trim()) {
+            const base = name.toLowerCase().replace(/\s+/g, '');
+            let attempts = 0;
+            let tag;
+            do {
+                tag = Math.floor(Math.random() * 9000 + 1000);
+                username = `${base}#${tag.toString().padStart(4, '0')}`;
+                attempts++;
+            } while (await User.findOne({ username }) && attempts < 10);
+            if (attempts >= 10) {
+                // Fallback, unlikely
+                username = `${base}#${Date.now().toString().slice(-4)}`;
+            }
+        }
+
+        const user = new User({ email, passwordHash, name, username });
         await user.save();
 
         const accessToken = generateAccessToken(user);
