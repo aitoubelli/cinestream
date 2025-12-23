@@ -1,30 +1,37 @@
-// frontend/src/app/layout.tsx
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-import './globals.css';
-import { AuthProvider } from '@/hooks/useAuth';
-import { Navigation } from '@/components/Navigation';
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+import { AuthProvider } from "@/context/AuthContext";
+import { Toaster } from "@/components/ui/sonner";
 
-const inter = Inter({ subsets: ['latin'] });
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
 export const metadata: Metadata = {
-  title: 'CineStream',
-  description: 'Votre plateforme de streaming préférée',
+  title: "Cineova",
+  description: "Discover and explore movies and TV shows",
 };
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
-    <html lang="fr">
-      <body className={inter.className}>
+    <html lang="en" className="dark">
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased dark`}
+      >
         <AuthProvider>
-          <div className="min-h-screen bg-background">
-            <Navigation />
-            <main className="container mx-auto px-4 py-8">{children}</main>
-          </div>
+          {children}
+          <Toaster />
         </AuthProvider>
       </body>
     </html>
