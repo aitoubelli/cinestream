@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { SlidersHorizontal, Grid3x3, List, ChevronLeft, ChevronRight, Search, ChevronDown } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { MovieCard } from '@/components/BrowseMovieCard';
+import { Footer } from '@/components/Footer';
 import { getApiUrl } from '@/lib/utils';
 import { filterResultsClientSide, type FilterState, type MediaItem } from '@/lib/filterUtils';
 
@@ -153,11 +154,20 @@ export function BrowsePage() {
             }
         }
 
-        // Slice to 18 items per page display
-        const displayResults = fetchedResults.slice(0, ITEMS_PER_PAGE_DISPLAY);
+        // Slice to 18 items per page display, accounting for current page
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE_DISPLAY;
+        const displayResults = fetchedResults.slice(startIndex, startIndex + ITEMS_PER_PAGE_DISPLAY);
         setResults(displayResults);
-        setTotalPages(data.totalPages || 1);
-        setTotalResults(data.totalResults || fetchedResults.length);
+
+        // For search results, calculate pagination based on actual results
+        if (filters.search) {
+          const totalSearchResults = fetchedResults.length;
+          setTotalResults(totalSearchResults);
+          setTotalPages(Math.ceil(totalSearchResults / ITEMS_PER_PAGE_DISPLAY));
+        } else {
+          setTotalPages(data.totalPages || 1);
+          setTotalResults(data.totalResults || fetchedResults.length);
+        }
       } else {
         setResults([]);
       }
@@ -500,6 +510,7 @@ export function BrowsePage() {
           </div>
         )}
       </div>
+      <Footer />
     </div>
   );
 }
