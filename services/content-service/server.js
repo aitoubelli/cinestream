@@ -186,6 +186,45 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 /**
  * @swagger
+ * /trending/all/week:
+ *   get:
+ *     summary: Get trending content (movies and TV)
+ *     tags: [Content]
+ *     responses:
+ *       200:
+ *         description: List of trending content
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TrendingResponse'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+app.get('/trending/all/week', async (req, res) => {
+    try {
+        const result = await getCachedOrFetch('tmdb:trending:all:week', () => fetchFromTMDB('/trending/all/week'));
+        if (!result.cached) {
+            for (const item of result.data.results) {
+                await Content.findOneAndUpdate(
+                    { tmdbId: item.id, mediaType: item.media_type },
+                    { data: item, updatedAt: new Date() },
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                );
+            }
+        }
+        res.set('X-Cache-Status', result.cached ? 'HIT' : 'MISS');
+        res.json(result.data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @swagger
  * /movies/trending:
  *   get:
  *     summary: Get trending movies
@@ -274,7 +313,7 @@ app.get('/tv/trending', async (req, res) => {
  *         schema:
  *           type: integer
  *           default: 1
- *         description: Page number
+         description: Page number
  *     responses:
  *       200:
  *         description: List of popular movies
@@ -1006,7 +1045,7 @@ app.get('/browse', async (req, res) => {
         const sortMap = {
             'popular': 'popularity.desc',
             'top_rated': 'vote_average.desc',
-            'newest': type === 'movie' ? 'release_date.desc' : 'first_air_date.desc'
+            'newest': type === 'movie' ? 'primary_release_date.desc' : 'first_air_date.desc'
         };
 
         if (sortBy !== 'trending' && sortMap[sortBy]) {
@@ -1018,9 +1057,13 @@ app.get('/browse', async (req, res) => {
             endpoint = `/trending/${type}/week`;
         } else {
             endpoint = `/discover/${type}`;
+            // If it's discover and no sort_by is provided, default to popularity.desc
+            if (!params.sort_by) {
+                params.sort_by = 'popularity.desc';
+            }
         }
 
-        const data = await fetchFromTMDB(endpoint, { params });
+        const data = await fetchFromTMDB(endpoint, params);
 
         // Transform results to match frontend expectations
         const results = data.results.map(item => {

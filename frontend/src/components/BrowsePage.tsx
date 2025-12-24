@@ -1,38 +1,33 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { SlidersHorizontal, X, ChevronDown, Grid3x3, List } from 'lucide-react';
+import { SlidersHorizontal, Grid3x3, List, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { MovieCard } from '@/components//BrowseMovieCard';
+import { MovieCard } from '@/components/BrowseMovieCard';
 import { getApiUrl } from '@/lib/utils';
+import { filterResultsClientSide, type FilterState, type MediaItem } from '@/lib/filterUtils';
+import FilterSidebar from './FilterSidebar';
+
+const ITEMS_PER_PAGE_DISPLAY = 18;
 
 export function BrowsePage() {
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [appending, setAppending] = useState(false);
+
   const router = useRouter();
   const searchParams = useSearchParams();
-  const isUpdatingUrl = useRef(false);
+  const isInitialMount = useRef(true);
 
-  const handleCardClick = (movie: any) => {
-    const baseRoute =
-      movie.type === 'anime' ? '/anime' :
-      movie.type === 'tv' || movie.type === 'series' ? '/series' :
-      '/movies';
-
-    router.push(`${baseRoute}/${movie.id}`);
-  };
-
-  // Filters
-  const [filters, setFilters] = useState({
+  // Filters state
+  const [filters, setFilters] = useState<FilterState>({
     search: '',
-    type: 'movie', // Default to movies instead of 'all'
+    type: 'all',
     genre: 'all',
     year: 'all',
     rating: 'all',
@@ -40,37 +35,58 @@ export function BrowsePage() {
     language: 'all'
   });
 
-  const genres = [
-    'All', 'Action', 'Adventure', 'Animation', 'Comedy', 'Crime',
-    'Documentary', 'Drama', 'Fantasy', 'Horror', 'Mystery',
-    'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western'
-  ];
+  // Handle Card Click
+  const handleCardClick = (movie: any) => {
+    const baseRoute =
+      movie.type === 'anime' ? '/anime' :
+      movie.type === 'tv' || movie.type === 'series' ? '/series' :
+      '/movies';
+    router.push(`${baseRoute}/${movie.id}`);
+  };
 
-  const years = ['All', '2025', '2024', '2023', '2022', '2021', '2020', '2019', '2018'];
-  const ratings = ['All', '9+', '8+', '7+', '6+', '5+'];
-  const sortOptions = ['Popular', 'Top Rated', 'Newest', 'Trending'];
-  const languages = ['All', 'English', 'Japanese', 'Korean', 'Spanish', 'French'];
+  // Sync state with URL on mount
+  useEffect(() => {
+    const urlFilters: FilterState = {
+      search: searchParams.get('search') || '',
+      type: searchParams.get('type') || 'all',
+      genre: searchParams.get('genre') || 'all',
+      year: searchParams.get('year') || 'all',
+      rating: searchParams.get('rating') || 'all',
+      sortBy: searchParams.get('sortBy') || 'popular',
+      language: searchParams.get('language') || 'all'
+    };
+    setFilters(urlFilters);
+    const page = parseInt(searchParams.get('page') || '1');
+    setCurrentPage(page);
+  }, []);
+
+  // Update URL when filters or page change
+  const updateUrl = (newFilters: FilterState, page: number) => {
+    const params = new URLSearchParams();
+    if (newFilters.search) params.set('search', newFilters.search);
+    if (newFilters.type !== 'all') params.set('type', newFilters.type);
+    if (newFilters.genre !== 'all') params.set('genre', newFilters.genre);
+    if (newFilters.year !== 'all') params.set('year', newFilters.year);
+    if (newFilters.rating !== 'all') params.set('rating', newFilters.rating);
+    if (newFilters.sortBy !== 'popular') params.set('sortBy', newFilters.sortBy);
+    if (newFilters.language !== 'all') params.set('language', newFilters.language);
+    if (page > 1) params.set('page', page.toString());
+
+    const newPath = params.toString() ? `/browse?${params.toString()}` : '/browse';
+    router.replace(newPath, { scroll: false });
+  };
 
   const handleFilterChange = (key: string, value: string) => {
-    // Clear results and reset state when changing filters (especially content type)
-    setResults([]);
     setCurrentPage(1);
-    setAppending(false); // Reset appending state
-    setFilters(prev => {
-      const newFilters = { ...prev, [key]: value };
-      // Update URL after state change
-      setTimeout(() => updateUrlFromFilters(), 0);
-      return newFilters;
-    });
+    const newFilters = { ...filters, [key]: value };
+    setFilters(newFilters);
+    updateUrl(newFilters, 1);
   };
 
   const resetFilters = () => {
-    setResults([]);
-    setCurrentPage(1);
-
-    const resetState = {
+    const resetState: FilterState = {
       search: '',
-      type: 'movie', // Reset to movies instead of 'all'
+      type: 'all',
       genre: 'all',
       year: 'all',
       rating: 'all',
@@ -78,357 +94,254 @@ export function BrowsePage() {
       language: 'all'
     };
     setFilters(resetState);
-
-    // Update URL to remove all filters
-    isUpdatingUrl.current = true;
+    setCurrentPage(1);
     router.replace('/browse', { scroll: false });
-    // Reset the flag after a brief delay to allow URL to update
-    setTimeout(() => {
-      isUpdatingUrl.current = false;
-    }, 10);
   };
 
-   // Initialize filters from URL on mount
-  useEffect(() => {
-    const type = searchParams.get('type') || 'movie';
-    const genre = searchParams.get('genre') || 'all';
-    const year = searchParams.get('year') || 'all';
-    const sortBy = searchParams.get('sortBy') || 'popular';
-    const rating = searchParams.get('rating') || 'all';
-    const language = searchParams.get('language') || 'all';
-    const search = searchParams.get('search') || '';
-
-    const urlFilters = {
-      search,
-      type: ['movie', 'tv'].includes(type) ? type as 'movie' | 'tv' : 'movie',
-      genre,
-      year,
-      rating,
-      sortBy,
-      language,
-    } as const;
-
-    setFilters(urlFilters);
-  }, []); // Only run on mount
-
-  // Update URL when filters change (after user interaction)
-  const updateUrlFromFilters = () => {
-    const params = new URLSearchParams();
-
-    if (filters.type !== 'all') params.set('type', filters.type);
-    if (filters.genre !== 'all') params.set('genre', filters.genre);
-    if (filters.year !== 'all') params.set('year', filters.year);
-    if (filters.sortBy !== 'popular') params.set('sortBy', filters.sortBy);
-    if (filters.rating !== 'all') params.set('rating', filters.rating);
-    if (filters.language !== 'all') params.set('language', filters.language);
-    if (filters.search) params.set('search', filters.search);
-
-    const newPath = params.toString() ? `/browse?${params.toString()}` : '/browse';
-    router.replace(newPath, { scroll: false });
-  };
-
-  const fetchBrowseData = async (page = 1, appendResults = false) => {
+  const fetchBrowseData = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        ...filters,
-        page: page.toString()
+      const queryParams = new URLSearchParams({
+        type: filters.type === 'all' ? 'movie' : filters.type, // Backend currently expects movie or tv
+        genre: filters.genre,
+        year: filters.year,
+        rating: filters.rating,
+        sortBy: filters.sortBy,
+        language: filters.language,
+        page: currentPage.toString()
       });
 
-      // Use unified browse API for all content types
-      const response = await fetch(`${getApiUrl('/api/browse')}?${params}`);
+      // Special case: if type is 'all' and no other major filters, maybe show trending all?
+      // For now, let's follow the backend /browse which requires movie or tv.
+      // If 'all' is selected, we'll fetch movies as default but the logic can be expanded.
+
+      const endpoint = '/api/content/browse';
+      const response = await fetch(`${getApiUrl(endpoint)}?${queryParams}`);
       const data = await response.json();
 
-      if (data.success) {
-        if (appendResults) {
-          // Append new results to existing results
-          setResults(prevResults => [...prevResults, ...(data.results || [])]);
-        } else {
-          // Replace results for initial load or filter change
-          setResults(data.results || []);
-          setCurrentPage(data.page || 1); // Only update currentPage when not appending
+      if (data.results) {
+        let fetchedResults = data.results;
+
+        // If we have a search query, and backend /browse doesn't support it,
+        // we might need to use /search endpoint or client-side filtering.
+        // content-service /search is multi-search.
+        // Let's check if there is a search query
+        if (filters.search) {
+            // Option A: Use client-side filtering on the results (limited)
+            // Option B: Fetch from /search instead
+            const searchResponse = await fetch(`${getApiUrl('/api/content/search')}?q=${encodeURIComponent(filters.search)}`);
+            const searchData = await searchResponse.json();
+            if (searchData.results) {
+                // Transform search results to MediaItem
+                fetchedResults = searchData.results
+                    .filter((item: any) => item.media_type !== 'person')
+                    .map((item: any) => ({
+                        id: item.id,
+                        title: item.title || item.name,
+                        poster: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null,
+                        rating: item.vote_average,
+                        year: item.release_date ? item.release_date.substring(0, 4) : item.first_air_date ? item.first_air_date.substring(0, 4) : 'N/A',
+                        genres: [], // Search multi doesn't always provide genre names easily
+                        type: item.media_type,
+                        original_language: item.original_language,
+                        release_date: item.release_date,
+                        first_air_date: item.first_air_date,
+                        vote_average: item.vote_average
+                    }));
+
+                // Still apply other filters client-side if they are set
+                fetchedResults = filterResultsClientSide(fetchedResults, filters);
+            }
         }
+
+        // Slice to 18 items per page display
+        const displayResults = fetchedResults.slice(0, ITEMS_PER_PAGE_DISPLAY);
+        setResults(displayResults);
         setTotalPages(data.totalPages || 1);
-        setTotalResults(data.totalResults || 0);
-        setAppending(false); // Reset appending state after fetch
+        setTotalResults(data.totalResults || fetchedResults.length);
       } else {
-        console.error('Failed to fetch browse data:', data.error);
-        if (!appendResults) {
-          setResults([]);
-        }
+        setResults([]);
       }
     } catch (error) {
       console.error('Error fetching browse data:', error);
-      if (!appendResults) {
-        setResults([]);
-      }
+      setResults([]);
     } finally {
       setLoading(false);
-      setAppending(false); // Always reset appending state
-    }
-  };
-
-
-
-  // Fetch data when filters or page changes (but not during append)
-  useEffect(() => {
-    if (!appending) {
-      fetchBrowseData(currentPage);
     }
   }, [filters, currentPage]);
 
-  const loadMore = () => {
-    if (currentPage < totalPages) {
-      setAppending(true);
-      fetchBrowseData(currentPage + 1, true); // Load next page and append results
+  useEffect(() => {
+    if (isInitialMount.current) {
+        isInitialMount.current = false;
+        // The first load is handled by the mount sync
+    }
+    fetchBrowseData();
+  }, [fetchBrowseData]);
+
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+      updateUrl(filters, page);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   return (
-    <div className="min-h-screen pt-32 pb-16 px-4 md:px-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl md:text-5xl mb-4 bg-gradient-to-r from-cyan-300 to-violet-300 bg-clip-text text-transparent">
-            Browse Content
-          </h1>
-          <p className="text-cyan-100/60">
-            {filters.search ? `Search results for "${filters.search}"` : 'Discover your next favorite movie or series'}
-          </p>
-        </div>
+    <div className="min-h-screen bg-[#050505] text-white font-sans flex flex-col pt-20">
+      <div className="flex flex-1 overflow-hidden relative">
 
-        {/* Filter Bar */}
-        <div className="mb-8">
-          <div
-            className="p-6 rounded-2xl backdrop-blur-md bg-black/40 border border-cyan-500/20"
-            style={{ boxShadow: '0 0 30px rgba(6, 182, 212, 0.15)' }}
-          >
-            {/* Quick Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-              {/* Type */}
-              <div>
-                <label className="block text-sm text-cyan-100/80 mb-2">Content Type</label>
-                <select
-                  value={filters.type}
-                  onChange={(e) => handleFilterChange('type', e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-10 focus:outline-none focus:border-cyan-400/60 cursor-pointer"
-                >
-                  <option value="movie">Movies</option>
-                  <option value="tv">Series</option>
-                </select>
-              </div>
+        {/* Sidebar */}
+        <FilterSidebar
+            filters={filters}
+            handleFilterChange={handleFilterChange}
+            resetFilters={resetFilters}
+            isMobileOpen={isMobileSidebarOpen}
+            closeMobile={() => setIsMobileSidebarOpen(false)}
+        />
 
-              {/* Genre */}
-              <div>
-                <label className="block text-sm text-cyan-100/80 mb-2">Genre</label>
-                <select
-                  value={filters.genre}
-                  onChange={(e) => handleFilterChange('genre', e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400/60 cursor-pointer"
-                >
-                  {genres.map(genre => (
-                    <option key={genre} value={genre.toLowerCase()}>{genre}</option>
-                  ))}
-                </select>
-              </div>
+        {/* Main Content */}
+        <main className="flex-1 h-[calc(100vh-80px)] overflow-y-auto p-4 lg:p-8 bg-gradient-to-br from-black to-zinc-900/50">
+            <div className="max-w-7xl mx-auto">
 
-              {/* Year */}
-              <div>
-                <label className="block text-sm text-cyan-100/80 mb-2">Year</label>
-                <select
-                  value={filters.year}
-                  onChange={(e) => handleFilterChange('year', e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400/60 cursor-pointer"
-                >
-                  {years.map(year => (
-                    <option key={year} value={year.toLowerCase()}>{year}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Sort By */}
-              <div>
-                <label className="block text-sm text-cyan-100/80 mb-2">Sort By</label>
-                <select
-                  value={filters.sortBy}
-                  onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400/60 cursor-pointer"
-                >
-                  {sortOptions.map(option => (
-                    <option key={option} value={option.toLowerCase().replace(' ', '-')}>{option}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Advanced Filters Toggle */}
-            <div className="flex items-center justify-between pt-4 border-t border-cyan-500/20">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-500/10 border border-violet-500/30 hover:border-violet-400/60 transition-all text-violet-300"
-              >
-                <SlidersHorizontal className="w-4 h-4" />
-                <span>{showAdvanced ? 'Hide' : 'Show'} Advanced Filters</span>
-                <motion.div
-                  animate={{ rotate: showAdvanced ? 180 : 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <ChevronDown className="w-4 h-4" />
-                </motion.div>
-              </motion.button>
-
-              <div className="flex items-center gap-3">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={resetFilters}
-                  className="px-4 py-2 rounded-lg text-cyan-300/80 hover:text-cyan-300 transition-colors"
-                >
-                  Reset Filters
-                </motion.button>
-
-                {/* View Mode Toggle */}
-                <div className="flex items-center gap-2 p-1 rounded-lg bg-black/60 border border-cyan-500/30">
-                  <button
-                    onClick={() => setViewMode('grid')}
-                    className={`p-2 rounded ${viewMode === 'grid' ? 'bg-cyan-500/20 text-cyan-300' : 'text-cyan-100/60'}`}
-                  >
-                    <Grid3x3 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode('list')}
-                    className={`p-2 rounded ${viewMode === 'list' ? 'bg-cyan-500/20 text-cyan-300' : 'text-cyan-100/60'}`}
-                  >
-                    <List className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Advanced Filters */}
-            <AnimatePresence>
-              {showAdvanced && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="pt-4 mt-4 border-t border-cyan-500/20"
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Rating */}
-                    <div>
-                      <label className="block text-sm text-cyan-100/80 mb-2">Minimum Rating</label>
-                      <select
-                        value={filters.rating}
-                        onChange={(e) => handleFilterChange('rating', e.target.value)}
-                        className="w-full px-4 py-2.5 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400/60 cursor-pointer"
-                      >
-                        {ratings.map(rating => (
-                          <option key={rating} value={rating.toLowerCase()}>{rating}</option>
-                        ))}
-                      </select>
+                {/* Mobile Filter Toggle & Controls */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => setIsMobileSidebarOpen(true)}
+                            className="lg:hidden flex items-center gap-2 bg-zinc-900 text-white px-4 py-2.5 rounded-xl text-sm font-bold border border-zinc-800 hover:border-cyan-500/50 transition-all"
+                        >
+                            <SlidersHorizontal className="w-4 h-4 text-cyan-400" />
+                            Filters
+                        </button>
+                        <div>
+                            <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">
+                                {filters.search ? `Results for "${filters.search}"` : 'Browse Library'}
+                            </h1>
+                            <p className="text-zinc-500 text-sm mt-1">
+                                {loading ? 'Updating results...' : `Showing ${results.length} of ${totalResults} titles`}
+                            </p>
+                        </div>
                     </div>
 
-                    {/* Language */}
-                    <div>
-                      <label className="block text-sm text-cyan-100/80 mb-2">Language</label>
-                      <select
-                        value={filters.language}
-                        onChange={(e) => handleFilterChange('language', e.target.value)}
-                        className="w-full px-4 py-2.5 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400/60 cursor-pointer"
-                      >
-                        {languages.map(lang => (
-                          <option key={lang} value={lang.toLowerCase()}>{lang}</option>
-                        ))}
-                      </select>
+                    <div className="flex items-center gap-3">
+                        {/* View Mode Toggle */}
+                        <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-900 border border-zinc-800">
+                            <button
+                                onClick={() => setViewMode('grid')}
+                                className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-cyan-500/20 text-cyan-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+                            >
+                                <Grid3x3 className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('list')}
+                                className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-cyan-500/20 text-cyan-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+                            >
+                                <List className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-
-        {/* Results Count */}
-        <div className="mb-6 flex items-center justify-between">
-          <p className="text-cyan-100/60">
-            {loading ? 'Loading...' : `Found ${totalResults} results`}
-          </p>
-        </div>
-
-        {/* Results Grid */}
-        <div className={
-          viewMode === 'grid'
-            ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6"
-            : "flex flex-col gap-6"
-        }>
-          {results.map((movie, index) => (
-            viewMode === 'grid' ? (
-              <MovieCard key={`${movie.type}_${movie.id}`} movie={movie} index={index} />
-            ) : (
-              <motion.div
-                key={`${movie.type}_${movie.id}`}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.05 }}
-                className="flex gap-4 p-4 rounded-xl bg-black/40 backdrop-blur-sm border border-cyan-500/20 hover:border-cyan-400/40 transition-all cursor-pointer"
-                onClick={() => handleCardClick(movie)}
-              >
-                <img
-                  src={movie.poster}
-                  alt={movie.title}
-                  className="w-24 h-36 object-cover rounded-lg"
-                />
-                <div className="flex-1">
-                  <h3 className="text-cyan-100 mb-2">{movie.title}</h3>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="px-2 py-1 rounded bg-cyan-500/20 text-cyan-300 text-xs">
-                      {movie.year}
-                    </span>
-                    <span className="px-2 py-1 rounded bg-yellow-500/20 text-yellow-300 text-xs flex items-center gap-1">
-                      ⭐ {movie.rating.toFixed(1)}
-                    </span>
-                  </div>
-                  <p className="text-cyan-100/60 text-sm line-clamp-2">
-                    {movie.genres.join(', ')}
-                  </p>
                 </div>
-              </motion.div>
-            )
-          ))}
-        </div>
 
-        {/* Load More */}
-        {!loading && currentPage < totalPages && (
-          <div className="mt-12 text-center">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={loadMore}
-              className="px-8 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-white"
-              style={{ boxShadow: '0 0 30px rgba(6, 182, 212, 0.4)' }}
-            >
-              Load More
-            </motion.button>
-          </div>
-        )}
+                {/* Content Grid/List */}
+                {loading && results.length === 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                        {[...Array(12)].map((_, i) => (
+                            <div key={i} className="aspect-[2/3] bg-zinc-900/50 rounded-2xl animate-pulse border border-zinc-800/50" />
+                        ))}
+                    </div>
+                ) : results.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-32 text-center">
+                        <div className="w-20 h-20 rounded-full bg-zinc-900 flex items-center justify-center mb-4 border border-zinc-800">
+                            <SlidersHorizontal className="w-8 h-8 text-zinc-700" />
+                        </div>
+                        <h3 className="text-xl font-bold text-white">No results found</h3>
+                        <p className="text-zinc-500 mt-2 max-w-xs">
+                            We couldn't find any content matching your current filters. Try adjusting them.
+                        </p>
+                        <button
+                            onClick={resetFilters}
+                            className="mt-6 text-cyan-400 hover:text-cyan-300 font-bold text-sm underline underline-offset-4"
+                        >
+                            Clear all filters
+                        </button>
+                    </div>
+                ) : (
+                    <div className={
+                        viewMode === 'grid'
+                            ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6"
+                            : "flex flex-col gap-4"
+                    }>
+                        {results.map((movie, index) => (
+                            viewMode === 'grid' ? (
+                                <MovieCard key={`${movie.type}_${movie.id}`} movie={movie} index={index} />
+                            ) : (
+                                <motion.div
+                                    key={`${movie.type}_${movie.id}`}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                                    className="flex gap-6 p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/50 hover:border-cyan-500/30 hover:bg-zinc-900/60 transition-all cursor-pointer group"
+                                    onClick={() => handleCardClick(movie)}
+                                >
+                                    <div className="relative w-24 md:w-32 aspect-[2/3] shrink-0 overflow-hidden rounded-xl shadow-2xl">
+                                        <img
+                                            src={movie.poster || '/fallback-poster.svg'}
+                                            alt={movie.title}
+                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                        />
+                                    </div>
+                                    <div className="flex-1 py-2">
+                                        <div className="flex items-start justify-between">
+                                            <h3 className="text-lg md:text-xl font-bold text-white group-hover:text-cyan-400 transition-colors line-clamp-1">
+                                                {movie.title}
+                                            </h3>
+                                            <div className="flex items-center gap-1 bg-yellow-500/10 text-yellow-500 px-2 py-1 rounded-lg text-xs font-bold border border-yellow-500/20">
+                                                ⭐ {movie.rating.toFixed(1)}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 mt-2">
+                                            <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">{movie.type}</span>
+                                            <span className="w-1 h-1 rounded-full bg-zinc-700" />
+                                            <span className="text-xs font-bold text-cyan-500/80">{movie.year}</span>
+                                        </div>
+                                        <p className="text-zinc-500 text-sm mt-4 line-clamp-2 md:line-clamp-3 leading-relaxed">
+                                            {movie.genres.join(' • ')}
+                                        </p>
+                                    </div>
+                                </motion.div>
+                            )
+                        ))}
+                    </div>
+                )}
 
-        {/* Loading indicator */}
-        {loading && (
-          <div className="mt-12 text-center">
-            <div className="inline-block w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin"></div>
-          </div>
-        )}
+                {/* Pagination */}
+                {totalPages > 1 && (
+                    <div className="mt-16 flex items-center justify-center gap-3 pb-12">
+                        <button
+                            onClick={() => goToPage(currentPage - 1)}
+                            disabled={currentPage === 1}
+                            className="p-2.5 bg-zinc-900 text-white rounded-xl disabled:opacity-30 border border-zinc-800 hover:border-cyan-500/50 hover:bg-zinc-800 transition-all"
+                        >
+                            <ChevronLeft className="w-5 h-5" />
+                        </button>
 
-        {/* No results */}
-        {!loading && results.length === 0 && (
-          <div className="mt-12 text-center">
-            <p className="text-cyan-100/60 text-lg">No results found. Try adjusting your filters.</p>
-          </div>
-        )}
+                        <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2">
+                            <span className="text-zinc-400 text-sm font-bold">
+                                Page <span className="text-white">{currentPage}</span> <span className="text-zinc-600 px-1">/</span> {totalPages}
+                            </span>
+                        </div>
+
+                        <button
+                            onClick={() => goToPage(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                            className="p-2.5 bg-zinc-900 text-white rounded-xl disabled:opacity-30 border border-zinc-800 hover:border-cyan-500/50 hover:bg-zinc-800 transition-all"
+                        >
+                            <ChevronRight className="w-5 h-5" />
+                        </button>
+                    </div>
+                )}
+            </div>
+        </main>
       </div>
     </div>
   );
