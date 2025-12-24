@@ -1,14 +1,12 @@
-import React from 'react';
-import { motion } from 'motion/react';
-import { X, Search } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Search, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { FilterState } from '@/lib/filterUtils';
 
 interface FilterSidebarProps {
   filters: FilterState;
   handleFilterChange: (key: string, value: string) => void;
   resetFilters: () => void;
-  isMobileOpen: boolean;
-  closeMobile: () => void;
 }
 
 const genres = [
@@ -37,154 +35,163 @@ const languages = [
 const FilterSidebar: React.FC<FilterSidebarProps> = ({
   filters,
   handleFilterChange,
-  resetFilters,
-  isMobileOpen,
-  closeMobile
+  resetFilters
 }) => {
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   return (
-    <>
-      {/* Overlay for mobile */}
-      {isMobileOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
-          onClick={closeMobile}
-        ></div>
-      )}
-
-      <aside className={`fixed inset-y-0 left-0 w-72 bg-black/90 border-r border-cyan-500/20 z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:h-[calc(100vh-80px)] overflow-y-auto ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="p-6 space-y-8">
-
-          {/* Header Mobile Only */}
-          <div className="flex justify-between items-center lg:hidden">
-            <h2 className="text-cyan-100 font-bold text-lg">Filters</h2>
-            <button onClick={closeMobile} className="text-cyan-100/60 hover:text-cyan-100">
-                <X className="w-6 h-6" />
-            </button>
+    <div className="mb-8">
+      <div
+        className="p-6 rounded-2xl backdrop-blur-md bg-black/40 border border-cyan-500/20"
+        style={{ boxShadow: '0 0 30px rgba(6, 182, 212, 0.15)' }}
+      >
+        {/* Search - Full Width */}
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-100/40" />
+            <input
+              type="text"
+              placeholder="Search movies..."
+              value={filters.search}
+              onChange={(e) => handleFilterChange('search', e.target.value)}
+              className="w-full bg-black/60 text-cyan-100 text-sm rounded-lg border border-cyan-500/30 pl-10 pr-4 py-2.5 focus:border-cyan-400/60 outline-none transition-all"
+            />
           </div>
+        </div>
 
-          {/* Search */}
-          <div>
-            <h3 className="text-cyan-100/40 text-xs font-bold uppercase tracking-wider mb-3">Search</h3>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-100/40" />
-              <input
-                type="text"
-                placeholder="Search movies..."
-                value={filters.search}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="w-full bg-black/40 text-cyan-100 text-sm rounded-lg border border-cyan-500/20 pl-10 pr-4 py-2 focus:border-cyan-500/50 outline-none transition-all"
-              />
-            </div>
-          </div>
-
+        {/* Quick Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           {/* Content Type */}
           <div>
-            <h3 className="text-cyan-100/40 text-xs font-bold uppercase tracking-wider mb-3">Content Type</h3>
-            <div className="flex bg-black/40 rounded-lg p-1 border border-cyan-500/20">
-              {['all', 'movie', 'tv'].map((type) => (
-                <button
-                  key={type}
-                  onClick={() => handleFilterChange('type', type)}
-                  className={`flex-1 py-2 text-xs font-bold rounded-md capitalize transition-all ${filters.type === type ? 'bg-cyan-500/20 text-cyan-300 shadow-sm' : 'text-cyan-100/40 hover:text-cyan-100'}`}
-                >
-                  {type === 'tv' ? 'Series' : type}
-                </button>
-              ))}
-            </div>
+            <label className="block text-sm text-cyan-100/80 mb-2">Content Type</label>
+            <select
+              value={filters.type}
+              onChange={(e) => handleFilterChange('type', e.target.value)}
+              className="w-full px-4 py-2.5 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400/60 cursor-pointer"
+            >
+              <option value="all">All</option>
+              <option value="movie">Movies</option>
+              <option value="tv">Series</option>
+            </select>
           </div>
 
-          {/* Sort By */}
+          {/* Genre */}
           <div>
-            <h3 className="text-cyan-100/40 text-xs font-bold uppercase tracking-wider mb-3">Sort By</h3>
+            <label className="block text-sm text-cyan-100/80 mb-2">Genre</label>
             <select
-                className="w-full bg-black/40 text-cyan-100 text-sm rounded-lg border border-cyan-500/20 px-3 py-2 focus:border-cyan-500/50 outline-none transition-all cursor-pointer"
-                value={filters.sortBy}
-                onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+              value={filters.genre}
+              onChange={(e) => handleFilterChange('genre', e.target.value)}
+              className="w-full px-4 py-2.5 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400/60 cursor-pointer"
             >
-                {sortOptions.map(option => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
+              {genres.map(genre => (
+                <option key={genre} value={genre.toLowerCase()}>{genre}</option>
+              ))}
             </select>
           </div>
 
           {/* Year */}
           <div>
-            <h3 className="text-cyan-100/40 text-xs font-bold uppercase tracking-wider mb-3">Year</h3>
+            <label className="block text-sm text-cyan-100/80 mb-2">Year</label>
             <select
-                className="w-full bg-black/40 text-cyan-100 text-sm rounded-lg border border-cyan-500/20 px-3 py-2 focus:border-cyan-500/50 outline-none transition-all cursor-pointer"
-                value={filters.year}
-                onChange={(e) => handleFilterChange('year', e.target.value)}
+              value={filters.year}
+              onChange={(e) => handleFilterChange('year', e.target.value)}
+              className="w-full px-4 py-2.5 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400/60 cursor-pointer"
             >
-                {years.map(year => (
-                  <option key={year} value={year.toLowerCase()}>{year}</option>
-                ))}
-            </select>
-          </div>
-
-          {/* Min Rating */}
-          <div>
-            <h3 className="text-cyan-100/40 text-xs font-bold uppercase tracking-wider mb-3 flex justify-between">
-                <span>Min Rating</span>
-                <span className="text-cyan-400">{filters.rating === 'all' ? '0+' : filters.rating}</span>
-            </h3>
-            <select
-                className="w-full bg-black/40 text-cyan-100 text-sm rounded-lg border border-cyan-500/20 px-3 py-2 focus:border-cyan-500/50 outline-none transition-all cursor-pointer"
-                value={filters.rating}
-                onChange={(e) => handleFilterChange('rating', e.target.value)}
-            >
-                {ratings.map(rating => (
-                  <option key={rating} value={rating.toLowerCase()}>{rating}</option>
-                ))}
-            </select>
-          </div>
-
-          {/* Language */}
-          <div>
-             <h3 className="text-cyan-100/40 text-xs font-bold uppercase tracking-wider mb-3">Language</h3>
-             <select
-                className="w-full bg-black/40 text-cyan-100 text-sm rounded-lg border border-cyan-500/20 px-3 py-2 focus:border-cyan-500/50 outline-none transition-all cursor-pointer"
-                value={filters.language}
-                onChange={(e) => handleFilterChange('language', e.target.value)}
-             >
-                {languages.map(lang => (
-                  <option key={lang.value} value={lang.value}>{lang.label}</option>
-                ))}
-             </select>
-          </div>
-
-          {/* Genres */}
-          <div>
-            <h3 className="text-cyan-100/40 text-xs font-bold uppercase tracking-wider mb-3">Genres</h3>
-            <div className="flex flex-wrap gap-2">
-              {genres.map(genre => (
-                <button
-                  key={genre}
-                  onClick={() => handleFilterChange('genre', genre.toLowerCase())}
-                  className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all ${
-                    filters.genre === genre.toLowerCase()
-                      ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
-                      : 'border-cyan-500/10 text-cyan-100/40 hover:border-cyan-500/30 hover:text-cyan-100'
-                  }`}
-                >
-                  {genre}
-                </button>
+              {years.map(year => (
+                <option key={year} value={year.toLowerCase()}>{year}</option>
               ))}
-            </div>
+            </select>
           </div>
 
-           {/* Reset Button */}
-           <motion.button
-             whileHover={{ scale: 1.02 }}
-             whileTap={{ scale: 0.98 }}
-             onClick={resetFilters}
-             className="w-full py-2.5 bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 hover:bg-cyan-500/20 hover:border-cyan-500/40 rounded-lg text-xs font-bold transition-all mt-4"
-           >
-             Reset Filters
-           </motion.button>
-
+          {/* Sort By */}
+          <div>
+            <label className="block text-sm text-cyan-100/80 mb-2">Sort By</label>
+            <select
+              value={filters.sortBy}
+              onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+              className="w-full px-4 py-2.5 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400/60 cursor-pointer"
+            >
+              {sortOptions.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
-      </aside>
-    </>
+
+        {/* Advanced Filters Toggle */}
+        <div className="flex items-center justify-between pt-4 border-t border-cyan-500/20">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-500/10 border border-violet-500/30 hover:border-violet-400/60 transition-all text-violet-300"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            <span>{showAdvanced ? 'Hide' : 'Show'} Advanced Filters</span>
+            <motion.div
+              animate={{ rotate: showAdvanced ? 180 : 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <ChevronDown className="w-4 h-4" />
+            </motion.div>
+          </motion.button>
+
+          <div className="flex items-center gap-3">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={resetFilters}
+              className="px-4 py-2 rounded-lg text-cyan-300/80 hover:text-cyan-300 transition-colors"
+            >
+              Reset Filters
+            </motion.button>
+          </div>
+        </div>
+
+        {/* Advanced Filters */}
+        <AnimatePresence>
+          {showAdvanced && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+              className="pt-4 mt-4 border-t border-cyan-500/20"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Rating */}
+                <div>
+                  <label className="block text-sm text-cyan-100/80 mb-2">Minimum Rating</label>
+                  <select
+                    value={filters.rating}
+                    onChange={(e) => handleFilterChange('rating', e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400/60 cursor-pointer"
+                  >
+                    {ratings.map(rating => (
+                      <option key={rating} value={rating.toLowerCase()}>{rating}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Language */}
+                <div>
+                  <label className="block text-sm text-cyan-100/80 mb-2">Language</label>
+                  <select
+                    value={filters.language}
+                    onChange={(e) => handleFilterChange('language', e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400/60 cursor-pointer"
+                  >
+                    {languages.map(lang => (
+                      <option key={lang.value} value={lang.value}>{lang.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
   );
 };
 
