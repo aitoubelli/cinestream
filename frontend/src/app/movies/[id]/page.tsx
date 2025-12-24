@@ -653,6 +653,7 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
           <RatingSection
             contentId={parseInt(resolvedParams.id)}
             contentType="movie"
+            onOpenLoginModal={() => setIsLoginOpen(true)}
           />
         </motion.section>
 
@@ -681,6 +682,7 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
             onLikeComment={handleLikeComment}
             onLikeReply={handleLikeReply}
             userAvatar={profileData ? getAvatarUrl(profileData.avatar) : undefined}
+            onOpenLoginModal={() => setIsLoginOpen(true)}
           />
 
           <Pagination

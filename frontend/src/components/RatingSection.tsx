@@ -11,9 +11,10 @@ import { getApiUrl } from "@/lib/utils";
 interface RatingSectionProps {
   contentId: number;
   contentType: 'movie' | 'series' | 'anime';
+  onOpenLoginModal?: () => void;
 }
 
-export function RatingSection({ contentId, contentType }: RatingSectionProps) {
+export function RatingSection({ contentId, contentType, onOpenLoginModal }: RatingSectionProps) {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -123,7 +124,13 @@ export function RatingSection({ contentId, contentType }: RatingSectionProps) {
           ) : (
             <div className="text-center py-4">
               <p className="text-cyan-100/60 text-sm">
-                Sign in to rate this content
+                <button
+                  onClick={onOpenLoginModal}
+                  className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2 transition-colors"
+                >
+                  Sign in
+                </button>{' '}
+                to rate this content
               </p>
             </div>
           )}
