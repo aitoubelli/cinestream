@@ -58,8 +58,5 @@ module.exports = (app) => {
         changeOrigin: true,
         pathRewrite: { '^/api/content': '' }
     }));
-    app.use('/api/comments', createProxyMiddleware({
-        target: 'http://localhost:4004',
-        changeOrigin: true
-    }));
+
 };

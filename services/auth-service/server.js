@@ -453,6 +453,39 @@ app.post('/api/auth/logout', async (req, res) => {
 
 /**
    * @swagger
+   * /token:
+   *   get:
+   *     summary: Get current JWT token
+   *     tags: [Auth]
+   *     responses:
+   *       200:
+   *         description: Token retrieved successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 token:
+   *                   type: string
+   *       401:
+   *         description: No token available
+   *       500:
+   *         description: Internal server error
+   */
+app.get('/api/auth/token', (req, res) => {
+    try {
+        const token = req.cookies.auth;
+        if (!token) {
+            return res.status(401).json({ error: 'No token available' });
+        }
+        res.json({ token });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+   * @swagger
    * /profile:
    *   put:
    *     summary: Update user profile

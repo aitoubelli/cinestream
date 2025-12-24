@@ -93,7 +93,7 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
 
   // Fetch comments
   const { data: commentsData, mutate: mutateComments } = useSWR(
-    getApiUrl(`/api/comments/${resolvedParams.id}?contentType=movie&page=${commentsPage}&sortBy=${sortBy}`),
+    getApiUrl(`/api/interactions/comments/${resolvedParams.id}?contentType=movie&page=${commentsPage}&sortBy=${sortBy}`),
     fetcher,
   );
 
@@ -170,7 +170,7 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
 
     try {
       const idToken = await user.getIdToken();
-      const response = await fetch(getApiUrl('/api/comments'), {
+      const response = await fetch(getApiUrl('/api/interactions/comments'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

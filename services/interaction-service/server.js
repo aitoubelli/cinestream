@@ -47,7 +47,8 @@ const Rating = mongoose.model('Rating', ratingSchema);
 let channel;
 async function connectRabbit() {
     try {
-        const conn = await amqp.connect('amqp://rabbitmq');
+        const url = process.env.RABBITMQ_URL || 'amqp://localhost:5672';
+        const conn = await amqp.connect(url);
         channel = await conn.createChannel();
         await channel.assertExchange('cinestream.events', 'topic', { durable: true });
         console.log('Connected to RabbitMQ');
@@ -80,7 +81,7 @@ const verifyToken = async (req, res, next) => {
 
 /**
  * @swagger
- * /comments:
+ * /interactions/comments:
  *   post:
  *     summary: Post a comment on content
  *     tags: [Interactions]
@@ -104,7 +105,7 @@ const verifyToken = async (req, res, next) => {
  *       401:
  *         description: Unauthorized
  */
-app.post('/comments', verifyToken, async (req, res) => {
+app.post('/interactions/comments', verifyToken, async (req, res) => {
     try {
         const { contentId, contentType, text } = req.body;
         if (!contentId || !contentType || !text) {
@@ -137,7 +138,7 @@ app.post('/comments', verifyToken, async (req, res) => {
 
 /**
  * @swagger
- * /comments/{contentId}:
+ * /interactions/comments/{contentId}:
  *   get:
  *     summary: Get comments for content
  *     tags: [Interactions]
@@ -178,7 +179,7 @@ app.post('/comments', verifyToken, async (req, res) => {
  *       400:
  *         description: Bad request
  */
-app.get('/comments/:contentId', async (req, res) => {
+app.get('/interactions/comments/:contentId', async (req, res) => {
     try {
         const { contentId } = req.params;
         const { contentType, page = 1, sortBy = 'newest' } = req.query;
@@ -244,7 +245,7 @@ app.get('/comments/:contentId', async (req, res) => {
 
 /**
  * @swagger
- * /ratings:
+ * /interactions/ratings:
  *   post:
  *     summary: Submit or update a rating for content
  *     tags: [Interactions]
@@ -268,7 +269,7 @@ app.get('/comments/:contentId', async (req, res) => {
  *       401:
  *         description: Unauthorized
  */
-app.post('/ratings', verifyToken, async (req, res) => {
+app.post('/interactions/ratings', verifyToken, async (req, res) => {
     try {
         const { contentId, contentType, score } = req.body;
         if (!contentId || !contentType || score === undefined) {
@@ -297,6 +298,141 @@ app.post('/ratings', verifyToken, async (req, res) => {
         res.json({ message: 'Rating submitted' });
     } catch (err) {
         console.error('Error submitting rating:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * @swagger
+ * /interactions/ratings/{contentId}:
+ *   get:
+ *     summary: Get ratings for content
+ *     tags: [Interactions]
+ *     parameters:
+ *       - in: path
+ *         name: contentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Content ID
+ *       - in: query
+ *         name: contentType
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [movie, tv]
+ *         description: Content type
+ *     responses:
+ *       200:
+ *         description: Ratings retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/GetRatingsResponse'
+ *       400:
+ *         description: Bad request
+ */
+app.get('/interactions/ratings/:contentId', async (req, res) => {
+    try {
+        const { contentId } = req.params;
+        const { contentType } = req.query;
+
+        if (!contentType || !['movie', 'tv'].includes(contentType)) {
+            return res.status(400).json({ error: 'Valid contentType (movie or tv) is required' });
+        }
+
+        // Get all ratings for this content
+        const ratings = await Rating.find({ contentId: parseInt(contentId), contentType }).lean();
+
+        // Calculate average rating and total ratings
+        const totalRatings = ratings.length;
+        const averageRating = totalRatings > 0
+            ? ratings.reduce((sum, rating) => sum + rating.score, 0) / totalRatings
+            : 0;
+
+        // Get user's rating if authenticated
+        let userRating = null;
+        if (req.user) {
+            const userRatingDoc = await Rating.findOne({
+                userId: req.user.id,
+                contentId: parseInt(contentId),
+                contentType
+            }).lean();
+            if (userRatingDoc) {
+                userRating = userRatingDoc.score;
+            }
+        }
+
+        res.json({
+            contentId: parseInt(contentId),
+            contentType,
+            averageRating: Math.round(averageRating * 10) / 10, // Round to 1 decimal
+            totalRatings,
+            userRating
+        });
+    } catch (err) {
+        console.error('Error fetching ratings:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * @swagger
+ * /interactions/comments/{commentId}:
+ *   delete:
+ *     summary: Delete a comment
+ *     tags: [Interactions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: commentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Comment ID
+ *     responses:
+ *       200:
+ *         description: Comment deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/DeleteCommentResponse'
+ *       403:
+ *         description: Forbidden - can only delete own comments
+ *       404:
+ *         description: Comment not found
+ *       401:
+ *         description: Unauthorized
+ */
+app.delete('/interactions/comments/:commentId', verifyToken, async (req, res) => {
+    try {
+        const { commentId } = req.params;
+
+        // Find the comment and check ownership
+        const comment = await Comment.findById(commentId);
+        if (!comment) {
+            return res.status(404).json({ error: 'Comment not found' });
+        }
+
+        // Check if user owns the comment
+        if (comment.userId.toString() !== req.user.id) {
+            return res.status(403).json({ error: 'Can only delete your own comments' });
+        }
+
+        await Comment.findByIdAndDelete(commentId);
+
+        // Publish event
+        publishEvent('comment.deleted', {
+            userId: req.user.id,
+            commentId,
+            contentId: comment.contentId,
+            contentType: comment.contentType
+        });
+
+        res.json({ message: 'Comment deleted successfully' });
+    } catch (err) {
+        console.error('Error deleting comment:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -384,6 +520,22 @@ const swaggerOptions = {
                         totalPages: { type: 'integer' },
                         currentPage: { type: 'integer' },
                         totalComments: { type: 'integer' }
+                    }
+                },
+                GetRatingsResponse: {
+                    type: 'object',
+                    properties: {
+                        contentId: { type: 'integer' },
+                        contentType: { type: 'string', enum: ['movie', 'tv'] },
+                        averageRating: { type: 'number' },
+                        totalRatings: { type: 'integer' },
+                        userRating: { type: 'number', nullable: true }
+                    }
+                },
+                DeleteCommentResponse: {
+                    type: 'object',
+                    properties: {
+                        message: { type: 'string' }
                     }
                 },
                 ErrorResponse: {

@@ -22,6 +22,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   refreshUserRole: () => Promise<void>;
   refreshProfileData: () => Promise<void>;
+  getIdToken: () => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -160,6 +161,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const getIdToken = async (): Promise<string | null> => {
+    try {
+      // Since we can't directly access httpOnly cookies from JavaScript,
+      // we'll make a request to get the token from the auth service
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/token`, {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.token;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting ID token:', error);
+      return null;
+    }
+  };
+
   const value = {
     user,
     userRole,
@@ -171,6 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     logout,
     refreshUserRole,
     refreshProfileData,
+    getIdToken,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

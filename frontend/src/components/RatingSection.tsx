@@ -22,7 +22,7 @@ export function RatingSection({ contentId, contentType, onOpenLoginModal }: Rati
 
   // Fetch rating data - works for both authenticated and non-authenticated users
   const { data: ratingData, mutate: mutateRating, isLoading } = useSWR(
-    getApiUrl(`/api/ratings/${contentId}?contentType=${contentType}`),
+    getApiUrl(`/api/interactions/ratings/${contentId}?contentType=${contentType}`),
     fetcher
   );
 
@@ -35,7 +35,7 @@ export function RatingSection({ contentId, contentType, onOpenLoginModal }: Rati
     setIsSubmitting(true);
     try {
       const idToken = await user.getIdToken();
-      const response = await fetch(getApiUrl('/api/ratings'), {
+      const response = await fetch(getApiUrl('/api/interactions/ratings'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
