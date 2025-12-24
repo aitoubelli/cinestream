@@ -15,7 +15,7 @@ interface RatingSectionProps {
 }
 
 export function RatingSection({ contentId, contentType, onOpenLoginModal }: RatingSectionProps) {
-  const { user } = useAuth();
+  const { user, getIdToken } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -34,7 +34,7 @@ export function RatingSection({ contentId, contentType, onOpenLoginModal }: Rati
 
     setIsSubmitting(true);
     try {
-      const idToken = await user.getIdToken();
+      const idToken = await getIdToken();
       const response = await fetch(getApiUrl('/api/interactions/ratings'), {
         method: 'POST',
         headers: {
@@ -44,7 +44,7 @@ export function RatingSection({ contentId, contentType, onOpenLoginModal }: Rati
         body: JSON.stringify({
           contentId,
           contentType,
-          rating,
+          score: rating,
         }),
       });
 
