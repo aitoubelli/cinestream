@@ -44,7 +44,7 @@ export function BrowsePage() {
     router.push(`${baseRoute}/${movie.id}`);
   };
 
-  // Sync state with URL on mount
+  // Sync state with URL on mount and when URL changes
   useEffect(() => {
     const urlFilters: FilterState = {
       search: searchParams.get('search') || '',
@@ -58,7 +58,7 @@ export function BrowsePage() {
     setFilters(urlFilters);
     const page = parseInt(searchParams.get('page') || '1');
     setCurrentPage(page);
-  }, []);
+  }, [searchParams]);
 
   // Update URL when filters or page change
   const updateUrl = (newFilters: FilterState, page: number) => {
@@ -154,17 +154,18 @@ export function BrowsePage() {
             }
         }
 
-        // Slice to 18 items per page display, accounting for current page
-        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE_DISPLAY;
-        const displayResults = fetchedResults.slice(startIndex, startIndex + ITEMS_PER_PAGE_DISPLAY);
-        setResults(displayResults);
-
-        // For search results, calculate pagination based on actual results
+        // Handle pagination: for search we do client-side, for browse the backend handles it
         if (filters.search) {
+          // Client-side pagination for search results
+          const startIndex = (currentPage - 1) * ITEMS_PER_PAGE_DISPLAY;
+          const displayResults = fetchedResults.slice(startIndex, startIndex + ITEMS_PER_PAGE_DISPLAY);
+          setResults(displayResults);
           const totalSearchResults = fetchedResults.length;
           setTotalResults(totalSearchResults);
           setTotalPages(Math.ceil(totalSearchResults / ITEMS_PER_PAGE_DISPLAY));
         } else {
+          // Backend handles pagination for browse
+          setResults(fetchedResults);
           setTotalPages(data.totalPages || 1);
           setTotalResults(data.totalResults || fetchedResults.length);
         }
@@ -413,8 +414,8 @@ export function BrowsePage() {
 
         {/* Content Grid/List */}
         {loading && results.length === 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-            {[...Array(12)].map((_, i) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-6">
+            {[...Array(10)].map((_, i) => (
               <div key={i} className="aspect-[2/3] bg-zinc-900/50 rounded-2xl animate-pulse border border-zinc-800/50" />
             ))}
           </div>
@@ -437,7 +438,7 @@ export function BrowsePage() {
         ) : (
           <div className={
             viewMode === 'grid'
-              ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6"
+              ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-4 md:gap-6"
               : "flex flex-col gap-4"
           }>
             {results.map((movie, index) => (

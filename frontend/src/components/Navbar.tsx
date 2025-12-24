@@ -45,8 +45,8 @@ export function Navbar() {
         endpoint = '/api/browse?sortBy=newest&type=all&page=1';
         sortBy = 'newest';
       } else if (pathname === '/top-rated') {
-        endpoint = '/api/browse?sortBy=top-rated&type=all&page=1';
-        sortBy = 'top-rated';
+        endpoint = '/api/browse?sortBy=top_rated&type=all&page=1';
+        sortBy = 'top_rated';
       } else {
         // Default browse
         endpoint = '/api/browse?page=1';
@@ -113,8 +113,8 @@ export function Navbar() {
     { name: 'Browse', href: '/browse' },
     { name: 'Trending', href: '/browse?sortBy=trending' },
     { name: 'Popular', href: '/browse?sortBy=popular' },
-    { name: 'Upcoming', href: '/browse?sortBy=newest' },
-    { name: 'Top Rated', href: '/browse?sortBy=top-rated' },
+    { name: 'Newest', href: '/browse?sortBy=newest' },
+    { name: 'Top Rated', href: '/browse?sortBy=top_rated' },
     { name: 'Random', href: null as string | null }
   ];
 
