@@ -189,7 +189,7 @@ export function BrowsePage() {
     <div className="min-h-screen bg-[#050505] text-white font-sans pt-20 pb-16 px-4 md:px-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mt-16 mb-8">
           <h1 className="text-4xl md:text-5xl mb-4 bg-gradient-to-r from-cyan-300 to-violet-300 bg-clip-text text-transparent">
             Browse Content
           </h1>
@@ -479,21 +479,21 @@ export function BrowsePage() {
             <button
               onClick={() => goToPage(currentPage - 1)}
               disabled={currentPage === 1}
-              className="p-2.5 bg-zinc-900 text-white rounded-xl disabled:opacity-30 border border-zinc-800 hover:border-cyan-500/50 hover:bg-zinc-800 transition-all"
+              className="p-2.5 bg-black/60 text-cyan-100 rounded-xl disabled:opacity-30 border border-cyan-500/30 hover:border-cyan-400/60 hover:bg-cyan-500/20 transition-all"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
 
-            <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2">
-              <span className="text-zinc-400 text-sm font-bold">
-                Page <span className="text-white">{currentPage}</span> <span className="text-zinc-600 px-1">/</span> {totalPages}
+            <div className="flex items-center bg-black/60 border border-cyan-500/30 rounded-xl px-4 py-2">
+              <span className="text-cyan-100/80 text-sm font-bold">
+                Page <span className="text-cyan-300">{currentPage}</span> <span className="text-cyan-100/60 px-1">/</span> {totalPages}
               </span>
             </div>
 
             <button
               onClick={() => goToPage(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="p-2.5 bg-zinc-900 text-white rounded-xl disabled:opacity-30 border border-zinc-800 hover:border-cyan-500/50 hover:bg-zinc-800 transition-all"
+              className="p-2.5 bg-black/60 text-cyan-100 rounded-xl disabled:opacity-30 border border-cyan-500/30 hover:border-cyan-400/60 hover:bg-cyan-500/20 transition-all"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
