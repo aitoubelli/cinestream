@@ -94,7 +94,7 @@ export function MovieCard({ movie, index, showProgress = false }: MovieCardProps
             <div className="flex items-center gap-2 mb-2">
               <div className="flex items-center gap-1">
                 <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                <span className="text-yellow-100 text-sm">{movie.rating.toFixed(1)}</span>
+                <span className="text-yellow-100 text-sm">{movie.rating ? movie.rating.toFixed(1) : 'N/A'}</span>
               </div>
               <span className="text-cyan-100/60 text-sm">•</span>
               <span className="text-cyan-100/80 text-sm">{movie.year}</span>
@@ -109,7 +109,7 @@ export function MovieCard({ movie, index, showProgress = false }: MovieCardProps
         <div className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-black/80 backdrop-blur-sm border border-yellow-500/30">
           <div className="flex items-center gap-1">
             <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-            <span className="text-yellow-100 text-xs">{movie.rating.toFixed(1)}</span>
+            <span className="text-yellow-100 text-xs">{movie.rating ? movie.rating.toFixed(1) : 'N/A'}</span>
           </div>
         </div>
       </div>

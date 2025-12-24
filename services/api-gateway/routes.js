@@ -53,4 +53,9 @@ module.exports = (app) => {
         changeOrigin: true,
         cookieDomainRewrite: false
     }));
+    app.use('/api/browse', createProxyMiddleware({
+        target: 'http://localhost:4003',
+        changeOrigin: true,
+        pathRewrite: { '^/api/browse': '/browse' }
+    }));
 };

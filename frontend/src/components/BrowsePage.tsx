@@ -32,7 +32,7 @@ export function BrowsePage() {
   // Filters
   const [filters, setFilters] = useState({
     search: '',
-    type: 'movie',
+    type: 'movie', // Default to movies instead of 'all'
     genre: 'all',
     year: 'all',
     rating: 'all',
@@ -70,7 +70,7 @@ export function BrowsePage() {
 
     const resetState = {
       search: '',
-      type: 'movie',
+      type: 'movie', // Reset to movies instead of 'all'
       genre: 'all',
       year: 'all',
       rating: 'all',
@@ -88,24 +88,24 @@ export function BrowsePage() {
     }, 10);
   };
 
-  // Initialize filters from URL on mount
+   // Initialize filters from URL on mount
   useEffect(() => {
-    const type = searchParams.get('type');
-    const genre = searchParams.get('genre');
-    const year = searchParams.get('year');
-    const sortBy = searchParams.get('sortBy');
-    const rating = searchParams.get('rating');
-    const language = searchParams.get('language');
-    const search = searchParams.get('search');
+    const type = searchParams.get('type') || 'movie';
+    const genre = searchParams.get('genre') || 'all';
+    const year = searchParams.get('year') || 'all';
+    const sortBy = searchParams.get('sortBy') || 'popular';
+    const rating = searchParams.get('rating') || 'all';
+    const language = searchParams.get('language') || 'all';
+    const search = searchParams.get('search') || '';
 
     const urlFilters = {
-      search: search || '',
-      type: type && ['all', 'movie', 'tv', 'anime'].includes(type) ? type as 'all' | 'movie' | 'tv' | 'anime' : 'movie',
-      genre: genre || 'all',
-      year: year || 'all',
-      rating: rating || 'all',
-      sortBy: sortBy || 'popular',
-      language: language || 'all',
+      search,
+      type: ['movie', 'tv'].includes(type) ? type as 'movie' | 'tv' : 'movie',
+      genre,
+      year,
+      rating,
+      sortBy,
+      language,
     } as const;
 
     setFilters(urlFilters);
@@ -115,7 +115,7 @@ export function BrowsePage() {
   const updateUrlFromFilters = () => {
     const params = new URLSearchParams();
 
-    if (filters.type !== 'movie') params.set('type', filters.type);
+    if (filters.type !== 'all') params.set('type', filters.type);
     if (filters.genre !== 'all') params.set('genre', filters.genre);
     if (filters.year !== 'all') params.set('year', filters.year);
     if (filters.sortBy !== 'popular') params.set('sortBy', filters.sortBy);
@@ -211,11 +211,10 @@ export function BrowsePage() {
                 <select
                   value={filters.type}
                   onChange={(e) => handleFilterChange('type', e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400/60 cursor-pointer"
+                  className="w-full px-4 py-2.5 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-10 focus:outline-none focus:border-cyan-400/60 cursor-pointer"
                 >
                   <option value="movie">Movies</option>
                   <option value="tv">Series</option>
-                  <option value="anime">Anime</option>
                 </select>
               </div>
 

@@ -875,8 +875,8 @@ app.get('/content/:type/:id', async (req, res) => {
  *         name: type
  *         schema:
  *           type: string
- *           enum: [all, movie, tv]
- *           default: all
+ *           enum: [movie, tv]
+ *           default: movie
  *         description: Content type
  *       - in: query
  *         name: genre
@@ -953,7 +953,7 @@ app.get('/content/:type/:id', async (req, res) => {
 app.get('/browse', async (req, res) => {
     try {
         const {
-            type = 'all',
+            type = 'movie',
             genre = 'all',
             year = 'all',
             rating = 'all',
@@ -965,35 +965,39 @@ app.get('/browse', async (req, res) => {
         const pageNum = parseInt(page) || 1;
 
         // Validate type parameter
-        if (type !== 'all' && type !== 'movie' && type !== 'tv') {
+        if (type !== 'movie' && type !== 'tv') {
             return res.status(400).json({
                 success: false,
-                error: 'Invalid type parameter. Must be "all", "movie", or "tv".',
+                error: 'Invalid type parameter. Must be "movie" or "tv".',
             });
         }
 
         // Build TMDB parameters
         const params = { page: pageNum };
 
-        // Genre mapping (simplified)
+        // Genre mapping (simplified) - using lowercase keys to match frontend
         const genreMap = {
-            'Action': 28, 'Adventure': 12, 'Animation': 16, 'Comedy': 35, 'Crime': 80,
-            'Documentary': 99, 'Drama': 18, 'Fantasy': 14, 'Horror': 27, 'Mystery': 9648,
-            'Romance': 10749, 'Sci-Fi': 878, 'Thriller': 53, 'War': 10752, 'Western': 37
+            'action': 28, 'adventure': 12, 'animation': 16, 'comedy': 35, 'crime': 80,
+            'documentary': 99, 'drama': 18, 'fantasy': 14, 'horror': 27, 'mystery': 9648,
+            'romance': 10749, 'sci-fi': 878, 'thriller': 53, 'war': 10752, 'western': 37
         };
 
+        // Only add genre filter if it's not 'all'
         if (genre !== 'all' && genreMap[genre]) {
             params.with_genres = genreMap[genre];
         }
 
+        // Only add year filter if it's not 'all'
         if (year !== 'all') {
             params[type === 'movie' ? 'primary_release_year' : 'first_air_date_year'] = year;
         }
 
+        // Only add rating filter if it's not 'all'
         if (rating !== 'all') {
-            params['vote_average.gte'] = parseFloat(rating);
+            params['vote_average.gte'] = parseFloat(rating.replace('+', '')); // Remove '+' from rating values like '8+'
         }
 
+        // Only add language filter if it's not 'all'
         if (language !== 'all') {
             params.with_original_language = language.toLowerCase();
         }
@@ -1011,47 +1015,27 @@ app.get('/browse', async (req, res) => {
 
         let endpoint;
         if (sortBy === 'trending') {
-            if (type === 'all') {
-                // For trending all, we'll fetch both and interleave
-                const [movieData, tvData] = await Promise.all([
-                    fetchFromTMDB('/trending/movie/week', { params: { page: pageNum } }),
-                    fetchFromTMDB('/trending/tv/week', { params: { page: pageNum } })
-                ]);
-
-                const movies = movieData.results || [];
-                const tvShows = tvData.results || [];
-
-                // Simple interleaving
-                const results = [];
-                const maxLen = Math.max(movies.length, tvShows.length);
-                for (let i = 0; i < maxLen && results.length < 20; i++) {
-                    if (movies[i]) results.push({ ...movies[i], type: 'movie' });
-                    if (tvShows[i] && results.length < 20) results.push({ ...tvShows[i], type: 'tv' });
-                }
-
-                return res.json({
-                    success: true,
-                    results,
-                    page: pageNum,
-                    totalPages: Math.max(movieData.total_pages, tvData.total_pages),
-                    totalResults: movieData.total_results + tvData.total_results
-                });
-            } else {
-                endpoint = `/trending/${type}/week`;
-            }
+            endpoint = `/trending/${type}/week`;
         } else {
-            if (type === 'all') {
-                // For non-trending all, use multi search or discover
-                endpoint = '/discover/movie'; // Default to movies for simplicity
-            } else {
-                endpoint = `/discover/${type}`;
-            }
+            endpoint = `/discover/${type}`;
         }
 
         const data = await fetchFromTMDB(endpoint, { params });
 
-        // Add type to results
-        const results = data.results.map(item => ({ ...item, type: type === 'all' ? (item.title ? 'movie' : 'tv') : type }));
+        // Transform results to match frontend expectations
+        const results = data.results.map(item => {
+            const isMovie = item.title !== undefined;
+
+            return {
+                id: item.id,
+                title: isMovie ? item.title : item.name,
+                poster: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null,
+                rating: item.vote_average,
+                year: isMovie ? (item.release_date ? item.release_date.substring(0, 4) : 'N/A') : (item.first_air_date ? item.first_air_date.substring(0, 4) : 'N/A'),
+                genres: item.genre_ids || [],
+                type: type
+            };
+        });
 
         res.json({
             success: true,
