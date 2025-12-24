@@ -67,7 +67,7 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
   const { user, profileData } = useAuth();
 
   const { data, error, isLoading } = useSWR(
-    getApiUrl(`/api/movies/content/movie/${resolvedParams.id}`),
+    getApiUrl(`/api/content/movies/${resolvedParams.id}`),
     fetcher,
   );
 
@@ -375,7 +375,7 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
     );
   }
 
-  const movie: Movie & { videos?: { results: Array<{ id: string; key: string; name: string; site: string; type: string }> } } = data?.data;
+  const movie: Movie & { videos?: { results: Array<{ id: string; key: string; name: string; site: string; type: string }> } } = data;
 
   // Find the first YouTube trailer
   const trailer = movie?.videos?.results?.find(video =>

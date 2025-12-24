@@ -39,11 +39,6 @@ module.exports = (app) => {
         target: 'http://localhost:4002',
         changeOrigin: true
     }));
-    app.use('/api/content', createProxyMiddleware({
-        target: 'http://localhost:4003',
-        changeOrigin: true,
-        pathRewrite: { '^/api/content': '' }
-    }));
     app.use('/api/interactions', createProxyMiddleware({
         target: 'http://localhost:4004',
         changeOrigin: true
@@ -57,5 +52,14 @@ module.exports = (app) => {
         target: 'http://localhost:4003',
         changeOrigin: true,
         pathRewrite: { '^/api/browse': '/browse' }
+    }));
+    app.use('/api/content', createProxyMiddleware({
+        target: 'http://localhost:4003',
+        changeOrigin: true,
+        pathRewrite: { '^/api/content': '' }
+    }));
+    app.use('/api/comments', createProxyMiddleware({
+        target: 'http://localhost:4004',
+        changeOrigin: true
     }));
 };

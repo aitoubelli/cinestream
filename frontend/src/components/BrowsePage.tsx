@@ -37,10 +37,11 @@ export function BrowsePage() {
 
   // Handle Card Click
   const handleCardClick = (movie: any) => {
-    const baseRoute =
-      movie.type === 'anime' ? '/anime' :
-      movie.type === 'tv' || movie.type === 'series' ? '/series' :
-      '/movies';
+    // Determine route based on content type
+    // For TV series: check if first_air_date exists and type is 'tv' or if name exists instead of title
+    // For movies: check if release_date exists and type is 'movie' or if title exists
+    const isTVSeries = movie.first_air_date || movie.type === 'tv' || movie.type === 'series' || (!movie.release_date && movie.name);
+    const baseRoute = isTVSeries ? '/series' : '/movies';
     router.push(`${baseRoute}/${movie.id}`);
   };
 

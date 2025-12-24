@@ -11,6 +11,9 @@ interface Movie {
   genres: string[];
   progress?: number;
   type?: string;
+  first_air_date?: string;
+  release_date?: string;
+  name?: string;
 }
 
 interface MovieCardProps {
@@ -23,11 +26,11 @@ export function MovieCard({ movie, index, showProgress = false }: MovieCardProps
   const router = useRouter();
 
   const handleCardClick = () => {
-    // Navigate to the appropriate detail page based on content type
-    const baseRoute =
-      movie.type === 'anime' ? '/anime' :
-      movie.type === 'tv' || movie.type === 'series' ? '/series' :
-      '/movies';
+    // Determine route based on content type
+    // For TV series: check if first_air_date exists and type is 'tv' or if name exists instead of title
+    // For movies: check if release_date exists and type is 'movie' or if title exists
+    const isTVSeries = movie.first_air_date || movie.type === 'tv' || movie.type === 'series' || (!movie.release_date && movie.name);
+    const baseRoute = isTVSeries ? '/series' : '/movies';
 
     router.push(`${baseRoute}/${movie.id}`);
   };

@@ -137,6 +137,113 @@ app.post('/comments', verifyToken, async (req, res) => {
 
 /**
  * @swagger
+ * /comments/{contentId}:
+ *   get:
+ *     summary: Get comments for content
+ *     tags: [Interactions]
+ *     parameters:
+ *       - in: path
+ *         name: contentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Content ID
+ *       - in: query
+ *         name: contentType
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [movie, tv]
+ *         description: Content type
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [newest, oldest, top]
+ *           default: newest
+ *         description: Sort order
+ *     responses:
+ *       200:
+ *         description: Comments retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/GetCommentsResponse'
+ *       400:
+ *         description: Bad request
+ */
+app.get('/comments/:contentId', async (req, res) => {
+    try {
+        const { contentId } = req.params;
+        const { contentType, page = 1, sortBy = 'newest' } = req.query;
+
+        if (!contentType || !['movie', 'tv'].includes(contentType)) {
+            return res.status(400).json({ error: 'Valid contentType (movie or tv) is required' });
+        }
+
+        const pageNum = parseInt(page) || 1;
+        const limit = 10; // comments per page
+        const skip = (pageNum - 1) * limit;
+
+        // Build sort options
+        let sortOptions = {};
+        switch (sortBy) {
+            case 'newest':
+                sortOptions = { createdAt: -1 };
+                break;
+            case 'oldest':
+                sortOptions = { createdAt: 1 };
+                break;
+            case 'top':
+                // For now, just sort by creation date, could be enhanced with likes later
+                sortOptions = { createdAt: -1 };
+                break;
+            default:
+                sortOptions = { createdAt: -1 };
+        }
+
+        // Get comments with user info
+        const comments = await Comment.find({ contentId: parseInt(contentId), contentType })
+            .sort(sortOptions)
+            .skip(skip)
+            .limit(limit)
+            .populate('userId', 'name avatar')
+            .lean();
+
+        // Get total count for pagination
+        const totalComments = await Comment.countDocuments({ contentId: parseInt(contentId), contentType });
+        const totalPages = Math.ceil(totalComments / limit);
+
+        // Transform comments to match frontend expectations
+        const transformedComments = comments.map(comment => ({
+            _id: comment._id,
+            text: comment.text,
+            createdAt: comment.createdAt,
+            userName: comment.userId?.name || 'Anonymous',
+            userAvatar: comment.userId?.avatar || null,
+            likes: [] // Placeholder for future likes feature
+        }));
+
+        res.json({
+            comments: transformedComments,
+            totalPages,
+            currentPage: pageNum,
+            totalComments
+        });
+    } catch (err) {
+        console.error('Error fetching comments:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * @swagger
  * /ratings:
  *   post:
  *     summary: Submit or update a rating for content
@@ -252,6 +359,31 @@ const swaggerOptions = {
                     type: 'object',
                     properties: {
                         message: { type: 'string' }
+                    }
+                },
+                GetCommentsResponse: {
+                    type: 'object',
+                    properties: {
+                        comments: {
+                            type: 'array',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    _id: { type: 'string' },
+                                    text: { type: 'string' },
+                                    createdAt: { type: 'string', format: 'date-time' },
+                                    userName: { type: 'string' },
+                                    userAvatar: { type: 'string', nullable: true },
+                                    likes: {
+                                        type: 'array',
+                                        items: { type: 'string' }
+                                    }
+                                }
+                            }
+                        },
+                        totalPages: { type: 'integer' },
+                        currentPage: { type: 'integer' },
+                        totalComments: { type: 'integer' }
                     }
                 },
                 ErrorResponse: {
