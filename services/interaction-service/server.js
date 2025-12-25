@@ -215,29 +215,37 @@ app.get('/interactions/comments/:contentId', async (req, res) => {
         const limit = 10; // comments per page
         const skip = (pageNum - 1) * limit;
 
-        // Build sort options
-        let sortOptions = {};
-        switch (sortBy) {
-            case 'newest':
-                sortOptions = { createdAt: -1 };
-                break;
-            case 'oldest':
-                sortOptions = { createdAt: 1 };
-                break;
-            case 'top':
-                // For now, just sort by creation date, could be enhanced with likes later
-                sortOptions = { createdAt: -1 };
-                break;
-            default:
-                sortOptions = { createdAt: -1 };
-        }
-
         // Get comments with user info
-        const comments = await Comment.find({ contentId: parseInt(contentId), contentType, parentId: null }) // Only top-level comments
-            .sort(sortOptions)
-            .skip(skip)
-            .limit(limit)
-            .lean();
+        let comments;
+        if (sortBy === 'top') {
+            // Use aggregation to sort by likes count descending
+            comments = await Comment.aggregate([
+                { $match: { contentId: parseInt(contentId), contentType, parentId: null } },
+                { $addFields: { likesCount: { $size: '$likes' } } },
+                { $sort: { likesCount: -1, createdAt: -1 } }, // Sort by likes desc, then by date desc for ties
+                { $skip: skip },
+                { $limit: limit }
+            ]);
+        } else {
+            // Build sort options for newest/oldest
+            let sortOptions = {};
+            switch (sortBy) {
+                case 'newest':
+                    sortOptions = { createdAt: -1 };
+                    break;
+                case 'oldest':
+                    sortOptions = { createdAt: 1 };
+                    break;
+                default:
+                    sortOptions = { createdAt: -1 };
+            }
+
+            comments = await Comment.find({ contentId: parseInt(contentId), contentType, parentId: null }) // Only top-level comments
+                .sort(sortOptions)
+                .skip(skip)
+                .limit(limit)
+                .lean();
+        }
 
         // Get total count for pagination
         const totalComments = await Comment.countDocuments({ contentId: parseInt(contentId), contentType, parentId: null });
@@ -578,9 +586,11 @@ app.post('/interactions/comments/:commentId/like', verifyToken, async (req, res)
     try {
         const { commentId } = req.params;
         const userId = req.user.id;
+        console.log('Like request:', { commentId, userId, contentType: req.body?.contentType });
 
         const comment = await Comment.findById(commentId);
         if (!comment) {
+            console.log('Comment not found:', commentId);
             return res.status(404).json({ error: 'Comment not found' });
         }
 
@@ -594,6 +604,7 @@ app.post('/interactions/comments/:commentId/like', verifyToken, async (req, res)
         }
         await comment.save();
 
+        console.log('Like updated:', { commentId, liked: likeIndex === -1, likesCount: comment.likes.length });
         res.json({ message: likeIndex > -1 ? 'Comment unliked' : 'Comment liked', likesCount: comment.likes.length });
     } catch (err) {
         console.error('Error liking comment:', err);

@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ThumbsUp, MessageCircle, Send, ChevronDown, Crown, Trophy, Medal, Edit } from 'lucide-react';
 import { ImageWithFallback } from './ImageWithFallback';
 import { toast } from 'sonner';
-import { getAvatarUrl } from '@/lib/utils';
+import { getAvatarUrl, formatRelativeTime } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 
 interface Reply {
@@ -23,6 +23,7 @@ interface Comment {
   text: string;
   timestamp: string;
   createdAt: Date;
+  editedAt?: Date;
   likes: number;
   likedByCurrentUser: boolean;
   isEdited?: boolean;
@@ -127,11 +128,35 @@ export function CommentsSection({
             >
               <div className="flex gap-4">
                 <div className="relative flex-shrink-0">
-                  <ImageWithFallback
-                    src={userAvatar || (profileData ? getAvatarUrl(profileData.avatar) : getAvatarUrl(0))}
-                    alt="Your avatar"
-                    className="w-12 h-12 rounded-full object-cover border-2 border-cyan-500/30"
-                  />
+                  <div
+                    className="p-4 rounded-2xl bg-black/40 backdrop-blur-sm border border-cyan-500/20 border-r-cyan-500/30 text-center h-full"
+                    style={{ boxShadow: '0 0 30px rgba(6, 182, 212, 0.15)' }}
+                  >
+                    <p className="text-sm mb-3 font-semibold">
+                      {profileData?.username ? (
+                        <>
+                          <span className="bg-gradient-to-r from-cyan-300 to-violet-300 bg-clip-text text-transparent">
+                            {profileData.username.split('#')[0]}
+                          </span>
+                          {profileData.username.includes('#') && (
+                            <span className="text-violet-400 font-bold">#{profileData.username.split('#')[1]}</span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="bg-gradient-to-r from-cyan-300 to-violet-300 bg-clip-text text-transparent">You</span>
+                      )}
+                    </p>
+                    <motion.div
+                      whileHover={{ scale: 1.1 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <ImageWithFallback
+                        src={userAvatar || (profileData ? getAvatarUrl(profileData.avatar) : getAvatarUrl(0))}
+                        alt="Your avatar"
+                        className="w-24 h-24 rounded-full object-cover border-2 border-cyan-500/30 mx-auto"
+                      />
+                    </motion.div>
+                  </div>
                 </div>
 
                 <div className="flex-1">
@@ -220,7 +245,7 @@ export function CommentsSection({
                     <span className="text-cyan-100/60 text-sm">{comment.timestamp}</span>
                     {getBadgeRank(comment.id) === 1 && (
                       <div className="flex items-center ml-2">
-                        <Crown className="w-4 h-4 text-yellow-500 animate-pulse" />
+                        <Crown className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                         <span className="text-yellow-500 text-xs font-bold ml-1">1st</span>
                       </div>
                     )}
@@ -266,6 +291,9 @@ export function CommentsSection({
                           Save
                         </motion.button>
                       </div>
+                      {comment.isEdited && comment.editedAt && (
+                        <p className="text-cyan-100/60 text-sm mt-2">Last edited: {formatRelativeTime(comment.editedAt)}</p>
+                      )}
                     </div>
                   ) : (
                     <p className="text-cyan-100/80 leading-relaxed mb-4">

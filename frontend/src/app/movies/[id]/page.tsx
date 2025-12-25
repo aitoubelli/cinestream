@@ -17,7 +17,7 @@ import { RatingSection } from "@/components/RatingSection";
 import { ErrorPage } from "@/components/ErrorPage";
 import { Pagination } from "@/components/Pagination";
 import { useAuth } from "@/context/AuthContext";
-import { getAvatarUrl, getApiUrl } from "@/lib/utils";
+import { getAvatarUrl, getApiUrl, formatRelativeTime } from "@/lib/utils";
 import { toast } from "sonner";
 import { use } from "react";
 
@@ -65,6 +65,8 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
   const [replyText, setReplyText] = useState('');
   const [expandedComments, setExpandedComments] = useState<Set<number>>(new Set());
   const [commentsPage, setCommentsPage] = useState(1);
+  const [editingComment, setEditingComment] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
   const { user, profileData, getIdToken } = useAuth();
 
   const { data, error, isLoading } = useSWR(
@@ -170,7 +172,7 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
     }
 
     try {
-      const idToken = await user.getIdToken();
+      const idToken = await getIdToken();
       const response = await fetch(getApiUrl('/api/interactions/comments'), {
         method: 'POST',
         headers: {
@@ -217,8 +219,8 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
     }
 
     try {
-      const idToken = await user.getIdToken();
-      const response = await fetch(getApiUrl('/api/comments/reply'), {
+      const idToken = await getIdToken();
+      const response = await fetch(getApiUrl(`/api/interactions/comments/${replyingTo}/reply`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -260,8 +262,8 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
     }
 
     try {
-      const idToken = await user.getIdToken();
-      const response = await fetch(getApiUrl(`/api/comments/${commentId}/like`), {
+      const idToken = await getIdToken();
+      const response = await fetch(getApiUrl(`/api/interactions/comments/${commentId}/like`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -286,8 +288,8 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
     }
 
     try {
-      const idToken = await user.getIdToken();
-      const response = await fetch(getApiUrl(`/api/comments/reply/${replyId}/like`), {
+      const idToken = await getIdToken();
+      const response = await fetch(getApiUrl(`/api/interactions/comments/${replyId}/like`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -302,6 +304,53 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
       mutateComments();
     } catch (error) {
       toast.error('Failed to like reply. Please try again.');
+    }
+  };
+
+  const handleEditComment = async (commentId: string) => {
+    if (!user) {
+      toast.error('You must be logged in to edit comments');
+      return;
+    }
+
+    if (!editText.trim()) {
+      toast.error('Comment cannot be empty');
+      return;
+    }
+
+    try {
+      const idToken = await getIdToken();
+      const response = await fetch(getApiUrl(`/api/interactions/comments/${commentId}`), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          text: editText.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to edit comment');
+      }
+
+      setEditingComment(null);
+      setEditText('');
+      mutateComments();
+      toast.success('Comment edited successfully');
+    } catch (error) {
+      toast.error('Failed to edit comment. Please try again.');
+    }
+  };
+
+  const handleToggleEdit = (commentId: string, currentText: string) => {
+    if (editingComment === commentId) {
+      setEditingComment(null);
+      setEditText('');
+    } else {
+      setEditingComment(commentId);
+      setEditText(currentText);
     }
   };
 
@@ -399,18 +448,21 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
     author: comment.userName || 'Anonymous',
     avatar: comment.userAvatar !== undefined ? getAvatarUrl(comment.userAvatar) : 'https://via.placeholder.com/150x150?text=' + (comment.userName?.charAt(0)?.toUpperCase() || 'U'),
     text: comment.text,
-    timestamp: new Date(comment.createdAt).toLocaleDateString(),
+    timestamp: comment.isEdited && comment.editedAt ? `Edited ${formatRelativeTime(new Date(comment.editedAt))}` : formatRelativeTime(new Date(comment.createdAt)),
     createdAt: new Date(comment.createdAt),
-    likes: comment.likes?.length || 0,
-    likedByCurrentUser: user ? comment.likes?.includes(user.uid) : false,
+    editedAt: comment.editedAt ? new Date(comment.editedAt) : undefined,
+    likes: comment.likesCount || 0,
+    likedByCurrentUser: comment.userLiked || false,
+    isEdited: comment.isEdited || false,
     replies: comment.replies?.map((reply: any) => ({
       id: reply._id,
       author: reply.userName || 'Anonymous',
       avatar: reply.userAvatar !== undefined ? getAvatarUrl(reply.userAvatar) : 'https://via.placeholder.com/150x150?text=' + (reply.userName?.charAt(0)?.toUpperCase() || 'U'),
       text: reply.text,
-      timestamp: new Date(reply.createdAt).toLocaleDateString(),
-      likes: reply.likes?.length || 0,
-      likedByCurrentUser: user ? reply.likes?.includes(user.uid) : false,
+      timestamp: reply.isEdited && reply.editedAt ? `Edited ${formatRelativeTime(new Date(reply.editedAt))}` : formatRelativeTime(new Date(reply.createdAt)),
+      likes: reply.likesCount || 0,
+      likedByCurrentUser: reply.userLiked || false,
+      isEdited: reply.isEdited || false,
     })) || [],
   })) || [];
 
@@ -449,7 +501,7 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
                   onClick={async () => {
                     if (user) {
                       try {
-                        const idToken = await user.getIdToken();
+                        const idToken = await getIdToken();
                         const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/continue-watching`, {
                           method: 'POST',
                           headers: {
@@ -658,6 +710,11 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
             onToggleReplies={handleToggleReplies}
             onLikeComment={handleLikeComment}
             onLikeReply={handleLikeReply}
+            editingComment={editingComment}
+            editText={editText}
+            onEditTextChange={setEditText}
+            onSubmitEdit={handleEditComment}
+            onToggleEdit={handleToggleEdit}
             userAvatar={profileData ? getAvatarUrl(profileData.avatar) : undefined}
             onOpenLoginModal={() => setIsLoginOpen(true)}
           />
