@@ -343,7 +343,7 @@ app.post('/verify', async (req, res) => {
             const user = await User.findById(decoded.id);
             if (!user) return res.status(401).json({ error: 'User not found' });
 
-            res.json({ user: { id: user._id, email: user.email, role: user.role } });
+            res.json({ user: { id: user._id, email: user.email, role: user.role, username: user.username, avatar: user.avatar } });
         });
     } catch (err) {
         res.status(500).json({ error: 'Internal server error' });
@@ -612,6 +612,26 @@ const swaggerOptions = {
 
 const swaggerSpec = swaggerJSDoc(swaggerOptions);
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// Internal endpoint for service-to-service communication (no auth required)
+app.put('/internal/users/:id/profile', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { username, name, avatar } = req.body;
+
+        const updateData = {};
+        if (username !== undefined) updateData.username = username;
+        if (name !== undefined) updateData.name = name;
+        if (avatar !== undefined) updateData.avatar = avatar;
+
+        const updatedUser = await User.findByIdAndUpdate(id, updateData, { new: true });
+        if (!updatedUser) return res.status(404).json({ error: 'User not found' });
+
+        res.json({ message: 'Profile updated' });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 // Health check
 app.get('/health', (req, res) => {

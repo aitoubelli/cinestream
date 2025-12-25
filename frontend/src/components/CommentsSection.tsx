@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { ThumbsUp, MessageCircle, Send, ChevronDown, Crown, Trophy, Medal } from 'lucide-react';
+import { ThumbsUp, MessageCircle, Send, ChevronDown, Crown, Trophy, Medal, Edit } from 'lucide-react';
 import { ImageWithFallback } from './ImageWithFallback';
 import { toast } from 'sonner';
 import { getAvatarUrl } from '@/lib/utils';
@@ -13,6 +13,7 @@ interface Reply {
   timestamp: string;
   likes: number;
   likedByCurrentUser: boolean;
+  isEdited?: boolean;
 }
 
 interface Comment {
@@ -24,6 +25,7 @@ interface Comment {
   createdAt: Date;
   likes: number;
   likedByCurrentUser: boolean;
+  isEdited?: boolean;
   replies: Reply[];
 }
 
@@ -43,6 +45,11 @@ interface CommentsSectionProps {
   onToggleReplies: (commentId: number) => void;
   onLikeComment: (commentId: number) => void;
   onLikeReply: (replyId: number) => void;
+  editingComment: string | null;
+  editText: string;
+  onEditTextChange: (text: string) => void;
+  onSubmitEdit: (commentId: string) => void;
+  onToggleEdit: (commentId: string, currentText: string) => void;
   userAvatar?: string;
   onOpenLoginModal?: () => void;
 }
@@ -63,6 +70,11 @@ export function CommentsSection({
   onToggleReplies,
   onLikeComment,
   onLikeReply,
+  editingComment,
+  editText,
+  onEditTextChange,
+  onSubmitEdit,
+  onToggleEdit,
   userAvatar,
   onOpenLoginModal,
 }: CommentsSectionProps) {
@@ -226,10 +238,40 @@ export function CommentsSection({
                     )}
                   </div>
 
-                  {/* Comment Text */}
-                  <p className="text-cyan-100/80 leading-relaxed mb-4">
-                    {comment.text}
-                  </p>
+                  {/* Comment Text or Edit Input */}
+                  {editingComment === comment.id.toString() ? (
+                    <div className="mb-4">
+                      <textarea
+                        value={editText}
+                        onChange={(e) => onEditTextChange(e.target.value)}
+                        placeholder="Edit your comment..."
+                        rows={3}
+                        className="w-full px-4 py-3 bg-black/40 border border-cyan-500/20 rounded-lg text-cyan-100 placeholder:text-cyan-100/40 focus:outline-none focus:border-cyan-400/60 resize-none"
+                        autoFocus
+                      />
+                      <div className="flex items-center justify-end mt-2 gap-2">
+                        <button
+                          onClick={() => onToggleEdit(comment.id.toString(), comment.text)}
+                          className="px-3 py-1 text-cyan-100/60 hover:text-cyan-300 text-sm"
+                        >
+                          Cancel
+                        </button>
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => onSubmitEdit(comment.id.toString())}
+                          disabled={!editText.trim()}
+                          className="px-3 py-1 rounded-lg bg-gradient-to-r from-cyan-500 to-violet-500 text-white disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        >
+                          Save
+                        </motion.button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-cyan-100/80 leading-relaxed mb-4">
+                      {comment.text}
+                    </p>
+                  )}
 
                   {/* Comment Actions */}
                   <div className="flex items-center gap-4">
@@ -252,6 +294,18 @@ export function CommentsSection({
                       >
                         <MessageCircle className="w-4 h-4 text-violet-400" />
                         <span className="text-violet-300 text-sm">Reply</span>
+                      </motion.button>
+                    )}
+
+                    {user && (
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => onToggleEdit(comment.id.toString(), comment.text)}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 hover:border-blue-400/60 transition-all"
+                      >
+                        <Edit className="w-4 h-4 text-blue-400" />
+                        <span className="text-blue-300 text-sm">Edit</span>
                       </motion.button>
                     )}
 
@@ -303,6 +357,7 @@ export function CommentsSection({
                       </motion.div>
                     )}
                   </AnimatePresence>
+
 
                   {/* Replies */}
                   <AnimatePresence>

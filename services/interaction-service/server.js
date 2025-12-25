@@ -29,10 +29,16 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://mongodb:27017/cinestream_in
 // Mongoose schemas
 const commentSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, required: true },
+    userName: { type: String, default: 'Anonymous' },
+    userAvatar: { type: Number, default: null },
     contentId: { type: Number, required: true },
     contentType: { type: String, enum: ['movie', 'tv'], required: true },
     text: { type: String, required: true },
-    createdAt: { type: Date, default: Date.now }
+    parentId: { type: mongoose.Schema.Types.ObjectId, default: null }, // For replies
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Users who liked
+    createdAt: { type: Date, default: Date.now },
+    editedAt: { type: Date, default: null },
+    isEdited: { type: Boolean, default: false }
 });
 
 const ratingSchema = new mongoose.Schema({
@@ -129,6 +135,8 @@ app.post('/interactions/comments', verifyToken, async (req, res) => {
 
         const comment = new Comment({
             userId: req.user.id,
+            userName: req.user.username || 'Anonymous',
+            userAvatar: req.user.avatar || null,
             contentId,
             contentType,
             text
@@ -225,26 +233,58 @@ app.get('/interactions/comments/:contentId', async (req, res) => {
         }
 
         // Get comments with user info
-        const comments = await Comment.find({ contentId: parseInt(contentId), contentType })
+        const comments = await Comment.find({ contentId: parseInt(contentId), contentType, parentId: null }) // Only top-level comments
             .sort(sortOptions)
             .skip(skip)
             .limit(limit)
-            .populate('userId', 'name avatar')
             .lean();
 
         // Get total count for pagination
-        const totalComments = await Comment.countDocuments({ contentId: parseInt(contentId), contentType });
+        const totalComments = await Comment.countDocuments({ contentId: parseInt(contentId), contentType, parentId: null });
         const totalPages = Math.ceil(totalComments / limit);
 
+        // Get replies for these comments
+        const commentIds = comments.map(c => c._id);
+        const replies = await Comment.find({ parentId: { $in: commentIds } })
+            .sort({ createdAt: 1 })
+            .lean();
+
+        // Group replies by parentId
+        const repliesByParent = replies.reduce((acc, reply) => {
+            const parentId = reply.parentId.toString();
+            if (!acc[parentId]) acc[parentId] = [];
+            acc[parentId].push(reply);
+            return acc;
+        }, {});
+
         // Transform comments to match frontend expectations
-        const transformedComments = comments.map(comment => ({
-            _id: comment._id,
-            text: comment.text,
-            createdAt: comment.createdAt,
-            userName: comment.userId?.name || 'Anonymous',
-            userAvatar: comment.userId?.avatar || null,
-            likes: [] // Placeholder for future likes feature
-        }));
+        const transformedComments = comments.map(comment => {
+            const commentReplies = repliesByParent[comment._id.toString()] || [];
+            const transformedReplies = commentReplies.map(reply => ({
+                _id: reply._id,
+                text: reply.text,
+                createdAt: reply.createdAt,
+                editedAt: reply.editedAt,
+                isEdited: reply.isEdited,
+                userName: reply.userName || 'Anonymous',
+                userAvatar: reply.userAvatar || null,
+                likesCount: reply.likes?.length || 0,
+                userLiked: req.user ? reply.likes?.includes(req.user.id) || false : false
+            }));
+
+            return {
+                _id: comment._id,
+                text: comment.text,
+                createdAt: comment.createdAt,
+                editedAt: comment.editedAt,
+                isEdited: comment.isEdited,
+                userName: comment.userName || 'Anonymous',
+                userAvatar: comment.userAvatar || null,
+                likesCount: comment.likes?.length || 0,
+                userLiked: req.user ? comment.likes?.includes(req.user.id) || false : false,
+                replies: transformedReplies
+            };
+        });
 
         res.json({
             comments: transformedComments,
@@ -449,6 +489,185 @@ app.delete('/interactions/comments/:commentId', verifyToken, async (req, res) =>
         res.json({ message: 'Comment deleted successfully' });
     } catch (err) {
         console.error('Error deleting comment:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * @swagger
+ * /interactions/comments/{commentId}:
+ *   put:
+ *     summary: Edit a comment
+ *     tags: [Interactions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: commentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - text
+ *             properties:
+ *               text:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Comment edited successfully
+ *       403:
+ *         description: Can only edit own comments
+ *       404:
+ *         description: Comment not found
+ */
+app.put('/interactions/comments/:commentId', verifyToken, async (req, res) => {
+    try {
+        const { commentId } = req.params;
+        const { text } = req.body;
+
+        if (!text || !text.trim()) {
+            return res.status(400).json({ error: 'Text is required' });
+        }
+
+        const comment = await Comment.findById(commentId);
+        if (!comment) {
+            return res.status(404).json({ error: 'Comment not found' });
+        }
+
+        if (comment.userId.toString() !== req.user.id) {
+            return res.status(403).json({ error: 'Can only edit your own comments' });
+        }
+
+        comment.text = text.trim();
+        comment.editedAt = new Date();
+        comment.isEdited = true;
+        await comment.save();
+
+        res.json({ message: 'Comment edited successfully' });
+    } catch (err) {
+        console.error('Error editing comment:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * @swagger
+ * /interactions/comments/{commentId}/like:
+ *   post:
+ *     summary: Like a comment
+ *     tags: [Interactions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: commentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Comment liked/unliked successfully
+ */
+app.post('/interactions/comments/:commentId/like', verifyToken, async (req, res) => {
+    try {
+        const { commentId } = req.params;
+        const userId = req.user.id;
+
+        const comment = await Comment.findById(commentId);
+        if (!comment) {
+            return res.status(404).json({ error: 'Comment not found' });
+        }
+
+        const likeIndex = comment.likes.indexOf(userId);
+        if (likeIndex > -1) {
+            // Unlike
+            comment.likes.splice(likeIndex, 1);
+        } else {
+            // Like
+            comment.likes.push(userId);
+        }
+        await comment.save();
+
+        res.json({ message: likeIndex > -1 ? 'Comment unliked' : 'Comment liked', likesCount: comment.likes.length });
+    } catch (err) {
+        console.error('Error liking comment:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * @swagger
+ * /interactions/comments/{commentId}/reply:
+ *   post:
+ *     summary: Reply to a comment
+ *     tags: [Interactions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: commentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - text
+ *             properties:
+ *               text:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Reply posted successfully
+ */
+app.post('/interactions/comments/:commentId/reply', verifyToken, async (req, res) => {
+    try {
+        const { commentId } = req.params;
+        const { text } = req.body;
+
+        if (!text || !text.trim()) {
+            return res.status(400).json({ error: 'Text is required' });
+        }
+
+        const parentComment = await Comment.findById(commentId);
+        if (!parentComment) {
+            return res.status(404).json({ error: 'Parent comment not found' });
+        }
+
+        const reply = new Comment({
+            userId: req.user.id,
+            userName: req.user.username || 'Anonymous',
+            userAvatar: req.user.avatar || null,
+            contentId: parentComment.contentId,
+            contentType: parentComment.contentType,
+            text: text.trim(),
+            parentId: commentId
+        });
+
+        await reply.save();
+
+        // Publish event
+        publishEvent('comment.replied', {
+            userId: req.user.id,
+            contentId: parentComment.contentId,
+            contentType: parentComment.contentType,
+            commentId: reply._id,
+            parentId: commentId
+        });
+
+        res.status(201).json({ message: 'Reply posted', replyId: reply._id });
+    } catch (err) {
+        console.error('Error posting reply:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });

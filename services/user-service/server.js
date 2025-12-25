@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
+const axios = require('axios');
 const helmet = require('helmet');
 const swaggerJSDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
@@ -12,6 +13,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 4002;
+const authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:4001';
 
 // Middleware
 app.use(helmet());
@@ -157,6 +159,19 @@ app.patch('/profile', verifyToken, async (req, res) => {
             updateData,
             { new: true, upsert: true }
         );
+
+        // Sync with auth service
+        try {
+            await axios.put(`${authServiceUrl}/internal/users/${req.user.id}/profile`, {
+                username,
+                name: fullName,
+                avatar
+            });
+        } catch (syncErr) {
+            console.error('Failed to sync profile with auth service:', syncErr.message);
+            // Don't fail the request if sync fails
+        }
+
         res.json({
             userId: profile.userId,
             email: profile.email,
