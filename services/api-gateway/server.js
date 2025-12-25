@@ -21,7 +21,8 @@ app.use(cors({
             return callback(new Error('Not allowed by CORS'));
         }
     },
-    credentials: true
+    credentials: true,
+    allowedHeaders: ['Authorization', 'Content-Type']
 }));
 app.use(helmet());
 app.use(express.json());

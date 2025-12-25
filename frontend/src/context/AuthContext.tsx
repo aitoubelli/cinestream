@@ -44,11 +44,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
 
+  const decodeToken = (token: string) => {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload;
+    } catch {
+      return null;
+    }
+  };
+
   // Check if user is logged in on mount
   useEffect(() => {
     const storedToken = localStorage.getItem('accessToken');
     if (storedToken) {
       setToken(storedToken);
+      const decoded = decodeToken(storedToken);
+      if (decoded) {
+        setUser({ email: decoded.email });
+        setUserRole(decoded.role);
+        setProfileData({
+          uid: decoded.id,
+          email: decoded.email,
+          username: '',
+          name: '',
+          avatar: 0,
+          role: decoded.role
+        });
+      }
     }
     checkAuthStatus();
   }, []);
@@ -72,10 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setUser({ email: data.email }); // Simplified user object
       } else {
         setProfileData(null);
-        setUserRole(null);
-        setUser(null);
-        setToken(null);
-        localStorage.removeItem('accessToken');
+        // Don't clear user and token on profile fetch failure, as user is set from token
       }
     } catch (error) {
       console.error('Error checking auth status:', error);
@@ -121,6 +140,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       localStorage.setItem('refreshToken', refreshToken);
       setToken(accessToken);
 
+      const decoded = decodeToken(accessToken);
+      if (decoded) {
+        setUser({ email: decoded.email });
+        setUserRole(decoded.role);
+        setProfileData({
+          uid: decoded.id,
+          email: decoded.email,
+          username: '',
+          name: '',
+          avatar: 0,
+          role: decoded.role
+        });
+      }
+
       console.log('Login successful, checking auth status');
       await checkAuthStatus(); // Refresh user data
       console.log('Auth status checked');
@@ -150,6 +183,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       localStorage.setItem('accessToken', accessToken);
       localStorage.setItem('refreshToken', refreshToken);
       setToken(accessToken);
+
+      const decoded = decodeToken(accessToken);
+      if (decoded) {
+        setUser({ email: decoded.email });
+        setUserRole(decoded.role);
+        setProfileData({
+          uid: decoded.id,
+          email: decoded.email,
+          username: '',
+          name: '',
+          avatar: 0,
+          role: decoded.role
+        });
+      }
 
       await checkAuthStatus(); // Refresh user data
     } catch (error) {
