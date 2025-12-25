@@ -37,8 +37,10 @@ const ratingSchema = new mongoose.Schema({
     contentId: { type: Number, required: true },
     contentType: { type: String, enum: ['movie', 'tv'], required: true },
     score: { type: Number, min: 1, max: 10, required: true },
-    createdAt: { type: Date, default: Date.now }
-});
+}, { timestamps: true });
+
+// Enforce one rating per user per content
+ratingSchema.index({ userId: 1, contentId: 1, contentType: 1 }, { unique: true });
 
 const Comment = mongoose.model('Comment', commentSchema);
 const Rating = mongoose.model('Rating', ratingSchema);
@@ -69,11 +71,44 @@ const verifyToken = async (req, res, next) => {
     if (!token) return res.status(401).json({ error: 'Missing token' });
 
     try {
-        const response = await axios.post('http://auth-service:4001/verify', { token });
+        const authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://auth-service:4001';
+        const response = await axios.post(`${authServiceUrl}/api/auth/verify`, { token }, {
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            timeout: 10000 // 10 second timeout
+        });
         req.user = response.data.user; // { id, email, role }
         next();
     } catch (err) {
+        console.error('Token verification error:', err.message);
+        if (err.code === 'ECONNABORTED') {
+            return res.status(500).json({ error: 'Token verification timeout' });
+        }
         res.status(401).json({ error: 'Invalid token' });
+    }
+};
+
+// Optional auth middleware for endpoints that can work with or without auth
+const optionalVerifyToken = async (req, res, next) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+        req.user = null;
+        return next();
+    }
+    try {
+        const authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://auth-service:4001';
+        const response = await axios.post(`${authServiceUrl}/api/auth/verify`, { token }, {
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            timeout: 10000
+        });
+        req.user = response.data.user;
+        next();
+    } catch (err) {
+        req.user = null;
+        next();
     }
 };
 
@@ -332,7 +367,7 @@ app.post('/interactions/ratings', verifyToken, async (req, res) => {
  *       400:
  *         description: Bad request
  */
-app.get('/interactions/ratings/:contentId', async (req, res) => {
+app.get('/interactions/ratings/:contentId', optionalVerifyToken, async (req, res) => {
     try {
         const { contentId } = req.params;
         const { contentType } = req.query;
@@ -368,7 +403,8 @@ app.get('/interactions/ratings/:contentId', async (req, res) => {
             contentType,
             averageRating: Math.round(averageRating * 10) / 10, // Round to 1 decimal
             totalRatings,
-            userRating
+            userRating,
+            hasUserRated: userRating !== null
         });
     } catch (err) {
         console.error('Error fetching ratings:', err);

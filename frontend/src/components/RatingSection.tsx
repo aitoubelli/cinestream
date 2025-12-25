@@ -18,7 +18,24 @@ export function RatingSection({ contentId, contentType, onOpenLoginModal }: Rati
   const { user, getIdToken } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetcher = (url: string) => fetch(url).then((res) => res.json());
+  const fetcher = async (url: string) => {
+    const headers: Record<string, string> = {};
+    if (user) {
+      try {
+        const idToken = await getIdToken();
+        if (idToken) {
+          headers['Authorization'] = `Bearer ${idToken}`;
+        }
+      } catch (error) {
+        console.error('Error getting ID token for ratings fetch:', error);
+      }
+    }
+    const response = await fetch(url, { headers });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ratings: ${response.status}`);
+    }
+    return response.json();
+  };
 
   // Fetch rating data - works for both authenticated and non-authenticated users
   const { data: ratingData, mutate: mutateRating, isLoading } = useSWR(
@@ -34,7 +51,14 @@ export function RatingSection({ contentId, contentType, onOpenLoginModal }: Rati
 
     setIsSubmitting(true);
     try {
+      console.log('Getting ID token...');
       const idToken = await getIdToken();
+      console.log('ID token retrieved:', idToken ? 'present' : 'missing');
+
+      if (!idToken) {
+        throw new Error('No authentication token available');
+      }
+
       const response = await fetch(getApiUrl('/api/interactions/ratings'), {
         method: 'POST',
         headers: {
@@ -48,12 +72,15 @@ export function RatingSection({ contentId, contentType, onOpenLoginModal }: Rati
         }),
       });
 
+      console.log('Response status:', response.status);
       if (!response.ok) {
-        throw new Error('Failed to submit rating');
+        const errorText = await response.text();
+        console.error('Rating submission failed:', errorText);
+        throw new Error(`Failed to submit rating: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
-      toast.success(result.message);
+      toast.success(result.message || 'Rating submitted successfully');
 
       // Update the rating data
       mutateRating();

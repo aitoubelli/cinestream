@@ -44,6 +44,31 @@ module.exports = (app) => {
         changeOrigin: true,
         pathRewrite: {
             '^/api/interactions': '/interactions'
+        },
+        timeout: 60000, // 60 seconds timeout
+        proxyTimeout: 60000, // 60 seconds proxy timeout
+        onProxyReq: (proxyReq, req, res) => {
+            console.log(`API Gateway: Forwarding ${req.method} ${req.url} to interaction service`);
+            console.log(`API Gateway: Request headers:`, req.headers);
+            // Ensure content-type is preserved
+            if (req.body) {
+                const bodyData = JSON.stringify(req.body);
+                proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+                proxyReq.write(bodyData);
+            }
+        },
+        onProxyRes: (proxyRes, req, res) => {
+            console.log(`API Gateway: Received response from interaction service with status ${proxyRes.statusCode}`);
+            // Remove secure flag from cookies to allow http
+            if (proxyRes.headers['set-cookie']) {
+                proxyRes.headers['set-cookie'] = proxyRes.headers['set-cookie'].map(cookie =>
+                    cookie.replace(/; secure/gi, '')
+                );
+            }
+        },
+        onError: (err, req, res) => {
+            console.error(`API Gateway: Proxy error for ${req.method} ${req.url}:`, err);
+            res.status(500).json({ error: 'Proxy error' });
         }
     }));
     app.use('/api/notifications', createProxyMiddleware({

@@ -42,7 +42,8 @@ const verifyToken = async (req, res, next) => {
     if (!token) return res.status(401).json({ error: 'Missing token' });
 
     try {
-        const response = await axios.post('http://auth-service:4001/verify', { token });
+        const authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://auth-service:4001';
+        const response = await axios.post(`${authServiceUrl}/verify`, { token });
         req.user = response.data.user; // { id, email, role }
         next();
     } catch (err) {
