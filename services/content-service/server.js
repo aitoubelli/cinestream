@@ -1005,6 +1005,9 @@ app.get('/browse', async (req, res) => {
 
         const pageNum = parseInt(page) || 1;
 
+        // Normalize genre to lowercase
+        const normalizedGenre = genre.toLowerCase();
+
         // Validate type parameter
         if (type !== 'movie' && type !== 'tv') {
             return res.status(400).json({
@@ -1017,15 +1020,23 @@ app.get('/browse', async (req, res) => {
         const params = { page: pageNum };
 
         // Genre mapping (simplified) - using lowercase keys to match frontend
-        const genreMap = {
+        const movieGenreMap = {
             'action': 28, 'adventure': 12, 'animation': 16, 'comedy': 35, 'crime': 80,
             'documentary': 99, 'drama': 18, 'fantasy': 14, 'horror': 27, 'mystery': 9648,
             'romance': 10749, 'sci-fi': 878, 'thriller': 53, 'war': 10752, 'western': 37
         };
 
+        const tvGenreMap = {
+            'action': 10759, 'adventure': 10759, 'animation': 16, 'comedy': 35, 'crime': 80,
+            'documentary': 99, 'drama': 18, 'fantasy': 10765, 'horror': 9648, 'mystery': 9648,
+            'romance': 10765, 'sci-fi': 10765, 'thriller': 9648, 'war': 10768, 'western': 37
+        };
+
+        const genreMap = type === 'tv' ? tvGenreMap : movieGenreMap;
+
         // Only add genre filter if it's not 'all'
-        if (genre !== 'all' && genreMap[genre]) {
-            params.with_genres = genreMap[genre];
+        if (normalizedGenre !== 'all' && genreMap[normalizedGenre]) {
+            params.with_genres = genreMap[normalizedGenre];
         }
 
         // Only add year filter if it's not 'all'

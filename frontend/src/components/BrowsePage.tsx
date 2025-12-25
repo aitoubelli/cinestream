@@ -22,7 +22,6 @@ export function BrowsePage() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const isInitialMount = useRef(true);
 
   // Handle Card Click
   const handleCardClick = (movie: any) => {
@@ -184,10 +183,6 @@ export function BrowsePage() {
   }, [filters, currentPage]);
 
   useEffect(() => {
-    if (isInitialMount.current) {
-        isInitialMount.current = false;
-        // The first load is handled by the mount sync
-    }
     fetchBrowseData();
   }, [fetchBrowseData]);
 
@@ -257,21 +252,21 @@ export function BrowsePage() {
                   className="w-full px-4 py-2.5 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400/60 cursor-pointer"
                 >
                   <option value="all">All</option>
-                  <option value="Action">Action</option>
-                  <option value="Adventure">Adventure</option>
-                  <option value="Animation">Animation</option>
-                  <option value="Comedy">Comedy</option>
-                  <option value="Crime">Crime</option>
-                  <option value="Documentary">Documentary</option>
-                  <option value="Drama">Drama</option>
-                  <option value="Fantasy">Fantasy</option>
-                  <option value="Horror">Horror</option>
-                  <option value="Mystery">Mystery</option>
-                  <option value="Romance">Romance</option>
-                  <option value="Sci-Fi">Sci-Fi</option>
-                  <option value="Thriller">Thriller</option>
-                  <option value="War">War</option>
-                  <option value="Western">Western</option>
+                  <option value="action">Action</option>
+                  <option value="adventure">Adventure</option>
+                  <option value="animation">Animation</option>
+                  <option value="comedy">Comedy</option>
+                  <option value="crime">Crime</option>
+                  <option value="documentary">Documentary</option>
+                  <option value="drama">Drama</option>
+                  <option value="fantasy">Fantasy</option>
+                  <option value="horror">Horror</option>
+                  <option value="mystery">Mystery</option>
+                  <option value="romance">Romance</option>
+                  <option value="sci-fi">Sci-Fi</option>
+                  <option value="thriller">Thriller</option>
+                  <option value="war">War</option>
+                  <option value="western">Western</option>
                 </select>
               </div>
 
@@ -399,6 +394,7 @@ export function BrowsePage() {
                         <option value="fr">French</option>
                         <option value="ja">Japanese</option>
                         <option value="ko">Korean</option>
+                        <option value="zh">Chinese</option>
                       </select>
                     </div>
                   </div>

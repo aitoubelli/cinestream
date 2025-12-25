@@ -135,7 +135,7 @@ export function MovieCard({ movie, index, category = 'movies', enableWatchlistTo
         <div className="relative overflow-hidden rounded-xl aspect-[2/3]">
           {/* Poster Image */}
           <Image
-            src={movie.poster}
+            src={movie.poster || '/fallback-poster.svg'}
             alt={movie.title}
             fill
             className="w-full h-full object-cover transition-all duration-500 group-hover:scale-110"
