@@ -31,9 +31,12 @@ export function RatingSection({ contentId, contentType, onOpenLoginModal }: Rati
     return response.json();
   };
 
+  // Get current token for SWR key to force re-fetch on login/logout
+  const currentToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+
   // Fetch rating data - works for both authenticated and non-authenticated users
   const { data: ratingData, mutate: mutateRating, isLoading } = useSWR(
-    getApiUrl(`/api/interactions/ratings/${contentId}?contentType=${contentType}`),
+    currentToken ? getApiUrl(`/api/interactions/ratings/${contentId}?contentType=${contentType}&_auth=1`) : getApiUrl(`/api/interactions/ratings/${contentId}?contentType=${contentType}`),
     fetcher
   );
 

@@ -7,6 +7,7 @@ const swaggerJSDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const dotenv = require('dotenv');
 const { requestLogger, startupLogger } = require('../../shared/logging');
+const verifyToken = require('../../shared/middleware/verifyToken');
 
 dotenv.config();
 
@@ -67,29 +68,6 @@ function publishEvent(routingKey, payload) {
     }
 }
 
-// Auth middleware
-const verifyToken = async (req, res, next) => {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ error: 'Missing token' });
-
-    try {
-        const authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://auth-service:4001';
-        const response = await axios.post(`${authServiceUrl}/verify`, { token }, {
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            timeout: 10000 // 10 second timeout
-        });
-        req.user = response.data.user; // { id, email, role }
-        next();
-    } catch (err) {
-        console.error('Token verification error:', err.message);
-        if (err.code === 'ECONNABORTED') {
-            return res.status(500).json({ error: 'Token verification timeout' });
-        }
-        res.status(401).json({ error: 'Invalid token' });
-    }
-};
 
 // Optional auth middleware for endpoints that can work with or without auth
 const optionalVerifyToken = async (req, res, next) => {

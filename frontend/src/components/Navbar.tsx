@@ -88,7 +88,10 @@ export function Navbar() {
     try {
       await logout();
       setIsProfileMenuOpen(false);
-      router.push('/');
+      // Only redirect to home if on profile or watchlist pages
+      if (pathname === '/profile' || pathname === '/watchlist') {
+        router.push('/');
+      }
     } catch (error) {
       console.error('Error logging out:', error);
     }
