@@ -1,5 +1,8 @@
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
+// Import authentication middlewares
+const { authenticateToken, optionalAuthenticateToken } = require('./server');
+
 module.exports = (app) => {
     app.use('/api/auth', createProxyMiddleware({
         target: 'http://localhost:4001',
@@ -12,8 +15,6 @@ module.exports = (app) => {
             '*': ''
         },
         onProxyReq: (proxyReq, req, res) => {
-            console.log(`API Gateway: Forwarding ${req.method} ${req.url} to auth service`);
-            console.log(`API Gateway: Request headers:`, req.headers);
             // Ensure content-type is preserved
             if (req.body) {
                 const bodyData = JSON.stringify(req.body);
@@ -22,7 +23,6 @@ module.exports = (app) => {
             }
         },
         onProxyRes: (proxyRes, req, res) => {
-            console.log(`API Gateway: Received response from auth service with status ${proxyRes.statusCode}`);
             // Remove secure flag from cookies to allow http
             if (proxyRes.headers['set-cookie']) {
                 proxyRes.headers['set-cookie'] = proxyRes.headers['set-cookie'].map(cookie =>
@@ -48,17 +48,15 @@ module.exports = (app) => {
         timeout: 60000, // 60 seconds timeout
         proxyTimeout: 60000, // 60 seconds proxy timeout
         onProxyReq: (proxyReq, req, res) => {
-            console.log(`API Gateway: Forwarding ${req.method} ${req.url} to interaction service`);
-            console.log(`API Gateway: Request headers:`, req.headers);
-            // Ensure content-type is preserved
-            if (req.body) {
+            // Ensure content-type is preserved and body is forwarded for POST/PUT/PATCH
+            if ((req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') && req.body) {
                 const bodyData = JSON.stringify(req.body);
+                proxyReq.setHeader('Content-Type', 'application/json');
                 proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
                 proxyReq.write(bodyData);
             }
         },
         onProxyRes: (proxyRes, req, res) => {
-            console.log(`API Gateway: Received response from interaction service with status ${proxyRes.statusCode}`);
             // Remove secure flag from cookies to allow http
             if (proxyRes.headers['set-cookie']) {
                 proxyRes.headers['set-cookie'] = proxyRes.headers['set-cookie'].map(cookie =>
