@@ -799,7 +799,29 @@ app.get('/health', (req, res) => {
 });
 
 // Connect to RabbitMQ on startup
-connectRabbit();
+connectRabbit().then(() => {
+    // Set up event consumers
+    if (channel) {
+        channel.assertQueue('profile.updated.queue', { durable: true });
+        channel.bindQueue('profile.updated.queue', 'cinestream.events', 'profile.updated');
+        channel.consume('profile.updated.queue', async (msg) => {
+            if (msg) {
+                const { userId, username, avatar } = JSON.parse(msg.content.toString());
+                try {
+                    // Update all comments by this user
+                    await Comment.updateMany(
+                        { userId },
+                        { userName: username, userAvatar: avatar }
+                    );
+                    console.log(`Updated comments for user ${userId} with new username ${username} and avatar ${avatar}`);
+                } catch (err) {
+                    console.error('Error updating comments on profile change:', err);
+                }
+                channel.ack(msg);
+            }
+        });
+    }
+});
 
 app.listen(PORT, () => {
     startupLogger('Interaction Service', PORT);

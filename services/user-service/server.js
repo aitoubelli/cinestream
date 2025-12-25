@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const axios = require('axios');
+const amqp = require('amqplib');
 const helmet = require('helmet');
 const swaggerJSDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
@@ -14,6 +15,26 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 4002;
 const authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:4001';
+
+// RabbitMQ setup
+let channel;
+async function connectRabbit() {
+    try {
+        const url = process.env.RABBITMQ_URL || 'amqp://localhost:5672';
+        const conn = await amqp.connect(url);
+        channel = await conn.createChannel();
+        await channel.assertExchange('cinestream.events', 'topic', { durable: true });
+        console.log('Connected to RabbitMQ');
+    } catch (error) {
+        console.error('RabbitMQ connection error:', error);
+    }
+}
+
+function publishEvent(routingKey, payload) {
+    if (channel) {
+        channel.publish('cinestream.events', routingKey, Buffer.from(JSON.stringify(payload)));
+    }
+}
 
 // Middleware
 app.use(helmet());
@@ -171,6 +192,13 @@ app.patch('/profile', verifyToken, async (req, res) => {
             console.error('Failed to sync profile with auth service:', syncErr.message);
             // Don't fail the request if sync fails
         }
+
+        // Publish event to update old comments
+        publishEvent('profile.updated', {
+            userId: req.user.id,
+            username: profile.username,
+            avatar: profile.avatar
+        });
 
         res.json({
             userId: profile.userId,
@@ -475,6 +503,9 @@ app.get('/internal/users-by-watchlist', async (req, res) => {
 app.get('/health', (req, res) => {
     res.json({ status: 'User Service OK' });
 });
+
+// Connect to RabbitMQ on startup
+connectRabbit();
 
 app.listen(PORT, () => {
     startupLogger('User Service', PORT);
