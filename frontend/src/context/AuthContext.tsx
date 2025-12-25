@@ -42,16 +42,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [userRole, setUserRole] = useState<'user' | 'admin' | null>(null);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState<string | null>(null);
 
   // Check if user is logged in on mount
   useEffect(() => {
+    const storedToken = localStorage.getItem('accessToken');
+    if (storedToken) {
+      setToken(storedToken);
+    }
     checkAuthStatus();
   }, []);
 
   const checkAuthStatus = async () => {
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/profile`, {
-        credentials: 'include', // Include cookies
+        headers,
       });
 
       if (response.ok) {
@@ -63,12 +74,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setProfileData(null);
         setUserRole(null);
         setUser(null);
+        setToken(null);
+        localStorage.removeItem('accessToken');
       }
     } catch (error) {
       console.error('Error checking auth status:', error);
       setProfileData(null);
       setUserRole(null);
       setUser(null);
+      setToken(null);
+      localStorage.removeItem('accessToken');
     } finally {
       setLoading(false);
     }
@@ -84,7 +99,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
       console.log('Fetch completed, response status:', response.status, 'ok:', response.ok);
@@ -100,6 +114,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         }
         throw new Error(error.error || 'Login failed');
       }
+
+      const data = await response.json();
+      const { accessToken, refreshToken } = data;
+      localStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('refreshToken', refreshToken);
+      setToken(accessToken);
 
       console.log('Login successful, checking auth status');
       await checkAuthStatus(); // Refresh user data
@@ -117,7 +137,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include', // Include cookies
         body: JSON.stringify({ email, password, name }),
       });
 
@@ -125,6 +144,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         const error = await response.json();
         throw new Error(error.error || 'Registration failed');
       }
+
+      const data = await response.json();
+      const { accessToken, refreshToken } = data;
+      localStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('refreshToken', refreshToken);
+      setToken(accessToken);
 
       await checkAuthStatus(); // Refresh user data
     } catch (error) {
@@ -148,10 +173,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const logout = async () => {
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-      });
+      // Optionally call logout endpoint, but since tokens are client-managed, just clear local
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      setToken(null);
       setUser(null);
       setUserRole(null);
       setProfileData(null);
@@ -162,22 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const getIdToken = async (): Promise<string | null> => {
-    try {
-      // Since we can't directly access httpOnly cookies from JavaScript,
-      // we'll make a request to get the token from the auth service
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/token`, {
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        return data.token;
-      }
-      return null;
-    } catch (error) {
-      console.error('Error getting ID token:', error);
-      return null;
-    }
+    return token;
   };
 
   const value = {

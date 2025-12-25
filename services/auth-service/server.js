@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const helmet = require('helmet');
-const cookieParser = require('cookie-parser');
 const swaggerJSDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const dotenv = require('dotenv');
@@ -18,7 +17,6 @@ const PORT = process.env.PORT || 4001;
 app.use(requestLogger);
 app.use(helmet());
 app.use(express.json());
-app.use(cookieParser());
 
 // MongoDB connection
 mongoose.connect(process.env.MONGO_URI, {
@@ -58,7 +56,7 @@ const generateRefreshToken = (user) => {
 
 // Middleware
 const verifyToken = (req, res, next) => {
-    const token = req.headers.authorization?.split(' ')[1] || req.cookies.auth;
+    const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ error: 'No token provided' });
     jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
         if (err) return res.status(401).json({ error: 'Invalid token' });
@@ -148,10 +146,7 @@ app.post('/api/auth/register', async (req, res) => {
         });
         await refreshTokenDoc.save();
 
-        // Set httpOnly cookie
-        res.cookie('auth', accessToken, { httpOnly: true, secure: false, sameSite: 'lax' });
-
-        res.status(201).json({ message: 'User registered successfully' });
+        res.status(201).json({ accessToken, refreshToken });
     } catch (err) {
         res.status(500).json({ error: 'Internal server error' });
     }
@@ -240,11 +235,8 @@ app.post('/api/auth/login', async (req, res) => {
         await refreshTokenDoc.save();
         console.log('Refresh token saved.');
 
-        // Set httpOnly cookie
-        res.cookie('auth', accessToken, { httpOnly: true, secure: false, sameSite: 'lax' });
-
         console.log('Login successful for user:', user.email);
-        res.json({ message: 'Login successful' });
+        res.json({ accessToken, refreshToken });
     } catch (err) {
         console.error('Login error:', err);
         res.status(500).json({ error: 'Internal server error' });
@@ -395,8 +387,7 @@ app.post('/api/auth/verify', async (req, res) => {
 app.get('/api/auth/profile', async (req, res) => {
     console.log('Profile request received');
     try {
-        // For now, get token from cookie (since auth-service sets it)
-        const token = req.cookies.auth;
+        const token = req.headers.authorization?.split(' ')[1];
         console.log('Token:', token ? 'present' : 'missing');
         if (!token) return res.status(401).json({ error: 'No token provided' });
 
@@ -428,21 +419,20 @@ app.get('/api/auth/profile', async (req, res) => {
 });
 
 /**
-   * @swagger
-   * /logout:
-   *   post:
-   *     summary: Logout user
-   *     tags: [Auth]
-   *     responses:
-   *       200:
-   *         description: Logout successful
-   *       500:
-   *         description: Internal server error
-   */
+    * @swagger
+    * /logout:
+    *   post:
+    *     summary: Logout user
+    *     tags: [Auth]
+    *     responses:
+    *       200:
+    *         description: Logout successful
+    *       500:
+    *         description: Internal server error
+    */
 app.post('/api/auth/logout', async (req, res) => {
     try {
-        // Clear the auth cookie
-        res.clearCookie('auth', { httpOnly: true, secure: false, sameSite: 'lax' });
+        // Logout is handled client-side by clearing tokens
         res.json({ message: 'Logout successful' });
     } catch (err) {
         res.status(500).json({ error: 'Internal server error' });
@@ -472,7 +462,7 @@ app.post('/api/auth/logout', async (req, res) => {
    */
 app.get('/api/auth/token', (req, res) => {
     try {
-        const token = req.cookies.auth;
+        const token = req.headers.authorization?.split(' ')[1];
         if (!token) {
             return res.status(401).json({ error: 'No token available' });
         }
