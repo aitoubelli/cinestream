@@ -1,5 +1,4 @@
 // shared/middleware/verifyToken.js
-const axios = require('axios');
 
 async function verifyToken(req, res, next) {
     const authHeader = req.headers['authorization'];
@@ -12,13 +11,20 @@ async function verifyToken(req, res, next) {
     try {
         // Use environment variable for Auth Service URL (flexible for Docker/local)
         const authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://auth-service:4001';
-        const response = await axios.post(
-            `${authServiceUrl}/api/auth/verify`,
-            { token },
-            { timeout: 2000 }
-        );
+        const response = await fetch(`${authServiceUrl}/verify`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token }),
+        });
 
-        req.user = response.data.user;
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        req.user = data.user;
         next();
     } catch (error) {
         console.error('Token verification failed:', error.message);

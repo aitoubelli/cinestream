@@ -8,21 +8,21 @@ import { Navbar } from './Navbar';
 import { avatarIds, getAvatarUrl } from '@/lib/utils';
 
 interface ProfileData {
-  uid: string;
+  userId: string;
   email: string;
   username: string;
-  name: string;
+  fullName: string;
   avatar: number;
   role: 'admin' | 'user';
 }
 
 export function ProfilePage() {
-  const { user, profileData, refreshProfileData, loading: authLoading } = useAuth();
+   const { user, profileData, refreshProfileData, loading: authLoading, getIdToken } = useAuth();
   const [isEditingUsername, setIsEditingUsername] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [usernameBase, setUsernameBase] = useState('');
   const [usernameTag, setUsernameTag] = useState('0001');
-  const [name, setName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState(0);
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState('');
@@ -36,6 +36,7 @@ export function ProfilePage() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   useEffect(() => {
+    console.log('Debug: ProfilePage profileData:', profileData);
     if (profileData && profileData.username) {
       const parts = profileData.username.split('#');
       if (parts.length === 2) {
@@ -50,12 +51,12 @@ export function ProfilePage() {
       setUsernameTag('0001');
     }
     if (profileData) {
-      setName(profileData.name || '');
+      setFullName(profileData.fullName || '');
       setSelectedAvatar(profileData.avatar || 0);
     }
   }, [profileData]);
 
-  const handleSaveProfile = async (field: 'username' | 'name') => {
+  const handleSaveProfile = async (field: 'username' | 'fullName') => {
     if (!user || !profileData) return;
 
     let value: string;
@@ -64,12 +65,12 @@ export function ProfilePage() {
       const formattedTag = usernameTag.padStart(4, '0');
       value = `${usernameBase}#${formattedTag}`;
     } else {
-      value = name;
+      value = fullName;
     }
 
     // Frontend validation
     if (!value || value.trim().length === 0) {
-      setUpdateError(`${field === 'username' ? 'Username' : 'Name'} cannot be empty`);
+      setUpdateError(`${field === 'username' ? 'Username' : 'Full Name'} cannot be empty`);
       return;
     }
 
@@ -78,24 +79,26 @@ export function ProfilePage() {
     setUpdateSuccess('');
 
     try {
-      const requestBody: any = {
-        name: field === 'name' ? value.trim() : profileData.name,
-        avatar: selectedAvatar,
-      };
+       const token = await getIdToken();
+       console.log('Debug: Token for profile update:', token);
+        const requestBody: any = {
+          fullName: field === 'fullName' ? value.trim() : profileData.fullName,
+          avatar: selectedAvatar,
+        };
 
-      // Include username if we're updating username
-      if (field === 'username') {
-        requestBody.username = value.trim();
-      }
+       // Include username if we're updating username
+       if (field === 'username') {
+         requestBody.username = value.trim();
+       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/profile`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(requestBody),
-      });
+       const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/profile`, {
+         method: 'PATCH',
+         headers: {
+           'Content-Type': 'application/json',
+           ...(token && { 'Authorization': `Bearer ${token}` }),
+         },
+         body: JSON.stringify(requestBody),
+       });
 
       if (!response.ok) {
         throw new Error('Failed to update profile');
@@ -135,17 +138,18 @@ export function ProfilePage() {
     setIsChangingPassword(true);
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/profile`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          currentPassword,
-          newPassword,
-        }),
-      });
+       const token = await getIdToken();
+       const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/change-password`, {
+         method: 'PUT',
+         headers: {
+           'Content-Type': 'application/json',
+           ...(token && { 'Authorization': `Bearer ${token}` }),
+         },
+         body: JSON.stringify({
+           currentPassword,
+           newPassword,
+         }),
+       });
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -292,8 +296,8 @@ export function ProfilePage() {
               <div className="flex gap-3">
                 <input
                   type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
                   disabled={!isEditingName}
                   className="flex-1 px-4 py-3 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400/60 disabled:opacity-60 disabled:cursor-not-allowed"
                   placeholder="Enter your full name"
@@ -315,7 +319,7 @@ export function ProfilePage() {
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => handleSaveProfile('name')}
+                    onClick={() => handleSaveProfile('fullName')}
                     disabled={isUpdating}
                     className="px-6 py-3 rounded-lg bg-gradient-to-r from-cyan-500 to-violet-500 text-white flex items-center justify-center gap-2 disabled:opacity-50"
                     style={{ boxShadow: '0 0 20px rgba(6, 182, 212, 0.4)' }}
@@ -418,7 +422,7 @@ export function ProfilePage() {
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => handleSaveProfile('name')}
+                  onClick={() => handleSaveProfile('fullName')}
                   disabled={isUpdating}
                   className="w-full py-3 rounded-lg bg-gradient-to-r from-cyan-500 to-violet-500 text-white flex items-center justify-center gap-2 disabled:opacity-50"
                   style={{ boxShadow: '0 0 20px rgba(6, 182, 212, 0.4)' }}

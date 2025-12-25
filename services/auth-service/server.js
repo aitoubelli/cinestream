@@ -332,7 +332,7 @@ app.post('/api/auth/refresh', async (req, res) => {
   *       500:
   *         description: Internal server error
   */
-app.post('/api/auth/verify', async (req, res) => {
+app.post('/verify', async (req, res) => {
     try {
         const { token } = req.body;
         if (!token) return res.status(400).json({ error: 'Token required' });
@@ -346,74 +346,6 @@ app.post('/api/auth/verify', async (req, res) => {
             res.json({ user: { id: user._id, email: user.email, role: user.role } });
         });
     } catch (err) {
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-/**
-  * @swagger
-  * /profile:
-  *   get:
-  *     summary: Get user profile
-  *     tags: [Auth]
-  *     security:
-  *       - bearerAuth: []
-  *     responses:
-  *       200:
-  *         description: User profile retrieved successfully
-  *         content:
-  *           application/json:
-  *             schema:
-  *               type: object
-  *               properties:
-  *                 uid:
-  *                   type: string
-  *                 email:
-  *                   type: string
-  *                 username:
-  *                   type: string
-  *                 name:
-  *                   type: string
-  *                 avatar:
-  *                   type: number
-  *                 role:
-  *                   type: string
-  *                   enum: [user, admin]
-  *       401:
-  *         description: Unauthorized
-  *       500:
-  *         description: Internal server error
-  */
-app.get('/api/auth/profile', async (req, res) => {
-    console.log('Profile request received');
-    try {
-        const token = req.headers.authorization?.split(' ')[1];
-        console.log('Token:', token ? 'present' : 'missing');
-        if (!token) return res.status(401).json({ error: 'No token provided' });
-
-        jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
-            console.log('JWT verify err:', err);
-            if (err) return res.status(401).json({ error: 'Invalid token' });
-
-            console.log('Decoded id:', decoded.id);
-            const user = await User.findById(decoded.id);
-            console.log('User found:', !!user);
-            if (!user) return res.status(401).json({ error: 'User not found' });
-
-            // Return profile in the format expected by frontend
-            const profile = {
-                uid: user._id.toString(),
-                email: user.email,
-                username: user.username || '',
-                name: user.name || '',
-                avatar: user.avatar || 0,
-                role: user.role
-            };
-            console.log('Returning profile:', profile);
-            res.json(profile);
-        });
-    } catch (err) {
-        console.error('Profile error:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -545,6 +477,66 @@ app.put('/api/auth/profile', verifyToken, async (req, res) => {
             avatar: updatedUser.avatar || 0,
             role: updatedUser.role
         });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+   * @swagger
+   * /change-password:
+   *   put:
+   *     summary: Change user password
+   *     tags: [Auth]
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - currentPassword
+   *               - newPassword
+   *             properties:
+   *               currentPassword:
+   *                 type: string
+   *               newPassword:
+   *                 type: string
+   *                 minLength: 6
+   *     responses:
+   *       200:
+   *         description: Password changed successfully
+   *       400:
+   *         description: Bad request
+   *       401:
+   *         description: Unauthorized or incorrect current password
+   *       500:
+   *         description: Internal server error
+   */
+app.put('/api/auth/change-password', verifyToken, async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: 'Current password and new password are required' });
+        }
+        if (newPassword.length < 6) {
+            return res.status(400).json({ error: 'New password must be at least 6 characters' });
+        }
+        const userId = req.user.id;
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
+        if (!isCurrentPasswordValid) {
+            return res.status(401).json({ error: 'Current password is incorrect' });
+        }
+        const newPasswordHash = await bcrypt.hash(newPassword, 10);
+        user.passwordHash = newPasswordHash;
+        await user.save();
+        // Invalidate refresh tokens for security
+        await RefreshToken.deleteMany({ userId });
+        res.json({ message: 'Password changed successfully' });
     } catch (err) {
         res.status(500).json({ error: 'Internal server error' });
     }

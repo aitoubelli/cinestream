@@ -11,23 +11,12 @@ module.exports = (app) => {
         proxyTimeout: 60000, // 60 seconds proxy timeout
         followRedirects: true,
         selfHandleResponse: false,
-        cookieDomainRewrite: {
-            '*': ''
-        },
         onProxyReq: (proxyReq, req, res) => {
             // Ensure content-type is preserved
             if (req.body) {
                 const bodyData = JSON.stringify(req.body);
                 proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
                 proxyReq.write(bodyData);
-            }
-        },
-        onProxyRes: (proxyRes, req, res) => {
-            // Remove secure flag from cookies to allow http
-            if (proxyRes.headers['set-cookie']) {
-                proxyRes.headers['set-cookie'] = proxyRes.headers['set-cookie'].map(cookie =>
-                    cookie.replace(/; secure/gi, '')
-                );
             }
         },
         onError: (err, req, res) => {
@@ -37,7 +26,22 @@ module.exports = (app) => {
     }));
     app.use('/api/user', createProxyMiddleware({
         target: 'http://localhost:4002',
-        changeOrigin: true
+        changeOrigin: true,
+        pathRewrite: { '^/api/user': '' },
+        onProxyReq: (proxyReq, req, res) => {
+            // Ensure content-type is preserved and body is forwarded for POST/PUT/PATCH
+            if ((req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') && req.body) {
+                const bodyData = JSON.stringify(req.body);
+                proxyReq.setHeader('Content-Type', 'application/json');
+                proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+                proxyReq.write(bodyData);
+            }
+        },
+    }));
+    app.use('/api/watchlist', createProxyMiddleware({
+        target: 'http://localhost:4002',
+        changeOrigin: true,
+        pathRewrite: { '^/api/watchlist': '/watchlist' }
     }));
     app.use('/api/interactions', createProxyMiddleware({
         target: 'http://localhost:4004',
@@ -54,14 +58,6 @@ module.exports = (app) => {
                 proxyReq.setHeader('Content-Type', 'application/json');
                 proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
                 proxyReq.write(bodyData);
-            }
-        },
-        onProxyRes: (proxyRes, req, res) => {
-            // Remove secure flag from cookies to allow http
-            if (proxyRes.headers['set-cookie']) {
-                proxyRes.headers['set-cookie'] = proxyRes.headers['set-cookie'].map(cookie =>
-                    cookie.replace(/; secure/gi, '')
-                );
             }
         },
         onError: (err, req, res) => {

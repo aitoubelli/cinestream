@@ -1,11 +1,12 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const axios = require('axios');
+const bcrypt = require('bcrypt');
 const helmet = require('helmet');
 const swaggerJSDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const dotenv = require('dotenv');
 const { requestLogger, startupLogger } = require('../../shared/logging');
+const verifyToken = require('../../shared/middleware/verifyToken');
 
 dotenv.config();
 
@@ -28,30 +29,28 @@ mongoose.connect(process.env.MONGO_URI, {
 const userProfileSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, required: true, unique: true, ref: 'User' },
     email: { type: String, required: true },
+    username: { type: String, default: '' },
     fullName: { type: String, default: '' },
-    avatar: { type: String, default: '' },
+    avatar: { type: Number, default: 0 },
     watchlist: [{
-        tmdbId: { type: Number, required: true },
-        type: { type: String, enum: ['movie', 'tv'], required: true }
+        contentId: { type: Number, required: true },
+        contentType: { type: String, enum: ['movie', 'tv'], required: true }
     }]
 });
 
 const UserProfile = mongoose.model('UserProfile', userProfileSchema);
 
-// Auth middleware
-const verifyToken = async (req, res, next) => {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ error: 'Missing token' });
+const userSchema = new mongoose.Schema({
+    email: { type: String, required: true, unique: true },
+    passwordHash: { type: String, required: true },
+    username: { type: String, default: '' },
+    name: { type: String, default: '' },
+    avatar: { type: Number, default: 0, min: 0, max: 19 },
+    role: { type: String, enum: ['user', 'admin'], default: 'user' },
+    createdAt: { type: Date, default: Date.now }
+});
 
-    try {
-        const authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://auth-service:4001';
-        const response = await axios.post(`${authServiceUrl}/verify`, { token });
-        req.user = response.data.user; // { id, email, role }
-        next();
-    } catch (err) {
-        res.status(401).json({ error: 'Invalid token' });
-    }
-};
+const User = mongoose.model('User', userSchema);
 
 // Routes
 
@@ -91,16 +90,18 @@ app.get('/profile', verifyToken, async (req, res) => {
             const newProfile = new UserProfile({ userId: req.user.id, email: req.user.email });
             await newProfile.save();
             return res.json({
-                id: newProfile.userId,
+                userId: newProfile.userId,
                 email: newProfile.email,
+                username: newProfile.username,
                 fullName: newProfile.fullName,
                 avatar: newProfile.avatar,
                 watchlist: newProfile.watchlist
             });
         }
         res.json({
-            id: profile.userId,
+            userId: profile.userId,
             email: profile.email,
+            username: profile.username,
             fullName: profile.fullName,
             avatar: profile.avatar,
             watchlist: profile.watchlist
@@ -146,15 +147,20 @@ app.get('/profile', verifyToken, async (req, res) => {
  */
 app.patch('/profile', verifyToken, async (req, res) => {
     try {
-        const { fullName, avatar } = req.body;
+        const { username, fullName, avatar } = req.body;
+        const updateData = {};
+        if (username !== undefined) updateData.username = username;
+        if (fullName !== undefined) updateData.fullName = fullName;
+        if (avatar !== undefined) updateData.avatar = avatar;
         const profile = await UserProfile.findOneAndUpdate(
             { userId: req.user.id },
-            { fullName, avatar },
+            updateData,
             { new: true, upsert: true }
         );
         res.json({
-            id: profile.userId,
+            userId: profile.userId,
             email: profile.email,
+            username: profile.username,
             fullName: profile.fullName,
             avatar: profile.avatar,
             watchlist: profile.watchlist
@@ -221,17 +227,17 @@ app.patch('/profile', verifyToken, async (req, res) => {
  */
 app.post('/watchlist', verifyToken, async (req, res) => {
     try {
-        const { tmdbId, type } = req.body;
-        if (!tmdbId || !type) return res.status(400).json({ error: 'tmdbId and type required' });
+        const { contentId, contentType } = req.body;
+        if (!contentId || !contentType) return res.status(400).json({ error: 'contentId and contentType required' });
 
         const profile = await UserProfile.findOne({ userId: req.user.id });
         if (!profile) return res.status(404).json({ error: 'Profile not found' });
 
         // Check if already in watchlist
-        const exists = profile.watchlist.some(item => item.tmdbId === tmdbId && item.type === type);
+        const exists = profile.watchlist.some(item => item.contentId === contentId && item.contentType === contentType);
         if (exists) return res.status(409).json({ error: 'Already in watchlist' });
 
-        profile.watchlist.push({ tmdbId, type });
+        profile.watchlist.push({ contentId, contentType });
         await profile.save();
         res.status(201).json({ message: 'Added to watchlist' });
     } catch (err) {
@@ -283,13 +289,13 @@ app.post('/watchlist', verifyToken, async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-app.delete('/watchlist/:tmdbId', verifyToken, async (req, res) => {
+app.delete('/watchlist/:contentId', verifyToken, async (req, res) => {
     try {
-        const tmdbId = parseInt(req.params.tmdbId);
+        const contentId = parseInt(req.params.contentId);
         const profile = await UserProfile.findOne({ userId: req.user.id });
         if (!profile) return res.status(404).json({ error: 'Profile not found' });
 
-        profile.watchlist = profile.watchlist.filter(item => item.tmdbId !== tmdbId);
+        profile.watchlist = profile.watchlist.filter(item => item.contentId !== contentId);
         await profile.save();
         res.json({ message: 'Removed from watchlist' });
     } catch (err) {
@@ -332,7 +338,7 @@ const swaggerOptions = {
                         userId: { type: 'string' },
                         email: { type: 'string', format: 'email' },
                         fullName: { type: 'string' },
-                        avatar: { type: 'string' },
+                        avatar: { type: 'number' },
                         watchlist: {
                             type: 'array',
                             items: { $ref: '#/components/schemas/WatchlistItem' }
@@ -342,23 +348,23 @@ const swaggerOptions = {
                 WatchlistItem: {
                     type: 'object',
                     properties: {
-                        tmdbId: { type: 'number' },
-                        type: { type: 'string', enum: ['movie', 'tv'] }
+                        contentId: { type: 'number' },
+                        contentType: { type: 'string', enum: ['movie', 'tv'] }
                     }
                 },
                 UpdateProfileRequest: {
                     type: 'object',
                     properties: {
                         fullName: { type: 'string' },
-                        avatar: { type: 'string' }
+                        avatar: { type: 'number' }
                     }
                 },
                 AddWatchlistRequest: {
                     type: 'object',
-                    required: ['tmdbId', 'type'],
+                    required: ['contentId', 'contentType'],
                     properties: {
-                        tmdbId: { type: 'number' },
-                        type: { type: 'string', enum: ['movie', 'tv'] }
+                        contentId: { type: 'number' },
+                        contentType: { type: 'string', enum: ['movie', 'tv'] }
                     }
                 },
                 ErrorResponse: {
@@ -384,12 +390,12 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // Internal endpoint for service-to-service communication (no auth required)
 app.get('/internal/users-by-watchlist', async (req, res) => {
     try {
-        const { tmdbId, type } = req.query;
-        if (!tmdbId || !type) return res.status(400).json({ error: 'tmdbId and type required' });
+        const { contentId, contentType } = req.query;
+        if (!contentId || !contentType) return res.status(400).json({ error: 'contentId and contentType required' });
 
         const profiles = await UserProfile.find({
             watchlist: {
-                $elemMatch: { tmdbId: parseInt(tmdbId), type }
+                $elemMatch: { contentId: parseInt(contentId), contentType }
             }
         });
 

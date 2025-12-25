@@ -3,10 +3,10 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 
 interface ProfileData {
-  uid: string;
+  userId: string;
   email: string;
   username: string;
-  name: string;
+  fullName: string;
   avatar: number;
   role: 'admin' | 'user';
 }
@@ -55,7 +55,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Check if user is logged in on mount
   useEffect(() => {
+    console.log('Debug: NEXT_PUBLIC_BACKEND_URL:', process.env.NEXT_PUBLIC_BACKEND_URL);
     const storedToken = localStorage.getItem('accessToken');
+    console.log('Debug: Stored token exists:', !!storedToken);
     if (storedToken) {
       setToken(storedToken);
       const decoded = decodeToken(storedToken);
@@ -63,38 +65,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setUser({ email: decoded.email });
         setUserRole(decoded.role);
         setProfileData({
-          uid: decoded.id,
+          userId: decoded.id,
           email: decoded.email,
           username: '',
-          name: '',
+          fullName: '',
           avatar: 0,
           role: decoded.role
         });
       }
+      // Pass the token directly to checkAuthStatus since state update is async
+      checkAuthStatus(storedToken);
+    } else {
+      checkAuthStatus(null);
     }
-    checkAuthStatus();
   }, []);
 
-  const checkAuthStatus = async () => {
+  const checkAuthStatus = async (overrideToken?: string | null) => {
+    const currentToken = overrideToken !== undefined ? overrideToken : localStorage.getItem('accessToken');
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      if (currentToken) {
+        headers['Authorization'] = `Bearer ${currentToken}`;
+        console.log('Debug: Sending Authorization header:', headers['Authorization']);
+      } else {
+        console.log('Debug: No token available for profile fetch');
       }
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/profile`, {
+      console.log('Debug: Fetching profile from:', `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/profile`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/user/profile`, {
         headers,
       });
+      console.log('Debug: Profile fetch response status:', response.status);
 
       if (response.ok) {
         const data = await response.json();
+        console.log('Debug: Setting profileData to:', data);
         setProfileData(data);
         setUserRole(data.role);
         setUser({ email: data.email }); // Simplified user object
       } else {
-        setProfileData(null);
-        // Don't clear user and token on profile fetch failure, as user is set from token
+        if (response.status === 401) {
+          // Token is invalid, clear it
+          setToken(null);
+          setUser(null);
+          setUserRole(null);
+          setProfileData(null);
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+        } else {
+          setProfileData(null);
+        }
       }
     } catch (error) {
       console.error('Error checking auth status:', error);
@@ -121,6 +142,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         body: JSON.stringify({ email, password }),
       });
       console.log('Fetch completed, response status:', response.status, 'ok:', response.ok);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log('Login failed, response body:', errorText);
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -136,8 +161,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       const data = await response.json();
       const { accessToken, refreshToken } = data;
+      console.log('Login successful, setting tokens');
       localStorage.setItem('accessToken', accessToken);
       localStorage.setItem('refreshToken', refreshToken);
+      console.log('Tokens set in localStorage');
       setToken(accessToken);
 
       const decoded = decodeToken(accessToken);
@@ -145,17 +172,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setUser({ email: decoded.email });
         setUserRole(decoded.role);
         setProfileData({
-          uid: decoded.id,
+          userId: decoded.id,
           email: decoded.email,
           username: '',
-          name: '',
+          fullName: '',
           avatar: 0,
           role: decoded.role
         });
       }
 
       console.log('Login successful, checking auth status');
-      await checkAuthStatus(); // Refresh user data
+      await checkAuthStatus(accessToken); // Refresh user data
       console.log('Auth status checked');
     } catch (error) {
       console.error("Error signing in with email:", error);
@@ -189,16 +216,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setUser({ email: decoded.email });
         setUserRole(decoded.role);
         setProfileData({
-          uid: decoded.id,
+          userId: decoded.id,
           email: decoded.email,
           username: '',
-          name: '',
+          fullName: '',
           avatar: 0,
           role: decoded.role
         });
       }
 
-      await checkAuthStatus(); // Refresh user data
+      await checkAuthStatus(accessToken); // Refresh user data
     } catch (error) {
       console.error("Error registering with email:", error);
       throw error;
@@ -234,7 +261,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const getIdToken = async (): Promise<string | null> => {
-    return token;
+    return localStorage.getItem('accessToken');
   };
 
   const value = {
