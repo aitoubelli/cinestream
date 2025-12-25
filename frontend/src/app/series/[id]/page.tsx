@@ -9,6 +9,7 @@ import { Play, Plus, Share2, Star, Clock, Calendar, ThumbsUp, ArrowLeft } from "
 import { ImageWithFallback } from "@/components/ImageWithFallback";
 import { MovieCard } from "@/components/MovieCard";
 import { TrailerModal } from "@/components/TrailerModal";
+import { LoginModal } from "@/components/LoginModal";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { CommentsSection } from "@/components/CommentsSection";
@@ -56,14 +57,15 @@ interface Series {
 }
 
 export default function SeriesDetail({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const [isTrailerOpen, setIsTrailerOpen] = useState(false);
-  const [sortBy, setSortBy] = useState<'newest' | 'top'>('newest');
-  const [commentText, setCommentText] = useState('');
-  const [replyingTo, setReplyingTo] = useState<number | null>(null);
-  const [replyText, setReplyText] = useState('');
-  const [expandedComments, setExpandedComments] = useState<Set<number>>(new Set());
-  const { user, profileData, getIdToken } = useAuth();
+   const resolvedParams = use(params);
+   const [isTrailerOpen, setIsTrailerOpen] = useState(false);
+   const [isLoginOpen, setIsLoginOpen] = useState(false);
+   const [sortBy, setSortBy] = useState<'newest' | 'top'>('newest');
+   const [commentText, setCommentText] = useState('');
+   const [replyingTo, setReplyingTo] = useState<number | null>(null);
+   const [replyText, setReplyText] = useState('');
+   const [expandedComments, setExpandedComments] = useState<Set<number>>(new Set());
+   const { user, profileData, getIdToken } = useAuth();
 
   const { data, error, isLoading } = useSWR(
     getApiUrl(`/api/content/series/${resolvedParams.id}`),
@@ -613,6 +615,7 @@ export default function SeriesDetail({ params }: { params: Promise<{ id: string 
           <RatingSection
             contentId={parseInt(resolvedParams.id)}
             contentType="tv"
+            onOpenLoginModal={() => setIsLoginOpen(true)}
           />
         </motion.section>
 
@@ -641,6 +644,7 @@ export default function SeriesDetail({ params }: { params: Promise<{ id: string 
             onLikeComment={handleLikeComment}
             onLikeReply={handleLikeReply}
             userAvatar={profileData ? getAvatarUrl(profileData.avatar) : undefined}
+            onOpenLoginModal={() => setIsLoginOpen(true)}
           />
         </motion.section>
       </div>
@@ -652,6 +656,13 @@ export default function SeriesDetail({ params }: { params: Promise<{ id: string 
         trailer={trailer}
         movieTitle={series.name}
       />
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={isLoginOpen}
+        onClose={() => setIsLoginOpen(false)}
+      />
+
       <Footer />
     </div>
   );

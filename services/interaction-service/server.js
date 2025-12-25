@@ -74,7 +74,7 @@ const verifyToken = async (req, res, next) => {
 
     try {
         const authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://auth-service:4001';
-        const response = await axios.post(`${authServiceUrl}/api/auth/verify`, { token }, {
+        const response = await axios.post(`${authServiceUrl}/verify`, { token }, {
             headers: {
                 'Content-Type': 'application/json'
             },
@@ -100,7 +100,7 @@ const optionalVerifyToken = async (req, res, next) => {
     }
     try {
         const authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://auth-service:4001';
-        const response = await axios.post(`${authServiceUrl}/api/auth/verify`, { token }, {
+        const response = await axios.post(`${authServiceUrl}/verify`, { token }, {
             headers: {
                 'Content-Type': 'application/json'
             },

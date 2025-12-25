@@ -20,15 +20,9 @@ export function RatingSection({ contentId, contentType, onOpenLoginModal }: Rati
 
   const fetcher = async (url: string) => {
     const headers: Record<string, string> = {};
-    if (user) {
-      try {
-        const idToken = await getIdToken();
-        if (idToken) {
-          headers['Authorization'] = `Bearer ${idToken}`;
-        }
-      } catch (error) {
-        console.error('Error getting ID token for ratings fetch:', error);
-      }
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
     const response = await fetch(url, { headers });
     if (!response.ok) {
