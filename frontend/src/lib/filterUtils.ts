@@ -16,6 +16,7 @@ export interface MediaItem {
   year: string;
   genres: string[];
   type: string;
+  contentType?: string;
   original_language?: string;
   release_date?: string;
   first_air_date?: string;

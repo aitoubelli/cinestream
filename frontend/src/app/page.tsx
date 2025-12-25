@@ -310,23 +310,23 @@ export default function Home() {
 
         {/* Continue Watching Section */}
         {user && continueWatchingMovies.length > 0 && (
-          <MovieGrid title="Continue Watching" movies={continueWatchingMovies} category="movies" enableWatchlistToggle={true} showProgress={true} />
+          <MovieGrid title="Continue Watching" movies={continueWatchingMovies} category="movies" enableWatchlistToggle={false} showProgress={true} />
         )}
 
         {/* Recommended For You Section */}
         {user && recommendedMovies.length > 0 && (
-          <MovieGrid title="Recommended For You" movies={recommendedMovies} category="movies" enableWatchlistToggle={true} />
+          <MovieGrid title="Recommended For You" movies={recommendedMovies} category="movies" enableWatchlistToggle={false} />
         )}
 
         {/* Newest Releases Section */}
         {newestMovies.length > 0 && (
-          <MovieGrid title="Newest Releases" movies={newestMovies} category="movies" enableWatchlistToggle={true} />
+          <MovieGrid title="Newest Releases" movies={newestMovies} category="movies" enableWatchlistToggle={false} />
         )}
 
 
 
-        <MovieGrid title="Trending Now" movies={trendingMovies} category={activeCategory} enableWatchlistToggle={true} />
-        <MovieGrid title="Popular This Week" movies={popularMovies} category={activeCategory} enableWatchlistToggle={true} />
+        <MovieGrid title="Trending Now" movies={trendingMovies} category={activeCategory} enableWatchlistToggle={false} />
+        <MovieGrid title="Popular This Week" movies={popularMovies} category={activeCategory} enableWatchlistToggle={false} />
       </main>
       <Footer />
     </div>

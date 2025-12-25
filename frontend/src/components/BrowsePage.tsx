@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { SlidersHorizontal, Grid3x3, List, ChevronLeft, ChevronRight, Search, ChevronDown } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { MovieCard } from '@/components/BrowseMovieCard';
+import { MovieCard } from '@/components/MovieCard';
 import { Footer } from '@/components/Footer';
 import { getApiUrl } from '@/lib/utils';
 import { filterResultsClientSide, type FilterState, type MediaItem } from '@/lib/filterUtils';
@@ -24,6 +24,14 @@ export function BrowsePage() {
   const searchParams = useSearchParams();
   const isInitialMount = useRef(true);
 
+  // Handle Card Click
+  const handleCardClick = (movie: any) => {
+    // Determine route based on content type
+    const isTVSeries = movie.contentType === 'tv' || movie.type === 'tv';
+    const baseRoute = isTVSeries ? '/series' : '/movies';
+    router.push(`${baseRoute}/${movie.id}`);
+  };
+
   // Filters state
   const [filters, setFilters] = useState<FilterState>({
     search: '',
@@ -35,15 +43,6 @@ export function BrowsePage() {
     language: 'all'
   });
 
-  // Handle Card Click
-  const handleCardClick = (movie: any) => {
-    // Determine route based on content type
-    // For TV series: check if first_air_date exists and type is 'tv' or if name exists instead of title
-    // For movies: check if release_date exists and type is 'movie' or if title exists
-    const isTVSeries = movie.first_air_date || movie.type === 'tv' || movie.type === 'series' || (!movie.release_date && movie.name);
-    const baseRoute = isTVSeries ? '/series' : '/movies';
-    router.push(`${baseRoute}/${movie.id}`);
-  };
 
   // Sync state with URL on mount and when URL changes
   useEffect(() => {
@@ -121,7 +120,10 @@ export function BrowsePage() {
       const data = await response.json();
 
       if (data.results) {
-        let fetchedResults = data.results;
+        let fetchedResults = data.results.map((item: any) => ({
+          ...item,
+          contentType: item.type === 'tv' ? 'tv' : 'movie'
+        }));
 
         // If we have a search query, and backend /browse doesn't support it,
         // we might need to use /search endpoint or client-side filtering.
@@ -143,7 +145,7 @@ export function BrowsePage() {
                         rating: item.vote_average,
                         year: item.release_date ? item.release_date.substring(0, 4) : item.first_air_date ? item.first_air_date.substring(0, 4) : 'N/A',
                         genres: [], // Search multi doesn't always provide genre names easily
-                        type: item.media_type,
+                        contentType: item.media_type,
                         original_language: item.original_language,
                         release_date: item.release_date,
                         first_air_date: item.first_air_date,
@@ -444,7 +446,7 @@ export function BrowsePage() {
           }>
             {results.map((movie, index) => (
               viewMode === 'grid' ? (
-                <MovieCard key={`${movie.type}_${movie.id}`} movie={movie} index={index} />
+                <MovieCard key={`${movie.contentType}_${movie.id}`} movie={movie} index={index} category={movie.contentType === 'tv' ? 'series' : 'movies'} enableWatchlistToggle={false} showProgress={false} />
               ) : (
                 <motion.div
                   key={`${movie.type}_${movie.id}`}
