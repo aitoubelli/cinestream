@@ -118,6 +118,7 @@ app.get('/profile', verifyToken, async (req, res) => {
                 username: newProfile.username,
                 fullName: newProfile.fullName,
                 avatar: newProfile.avatar,
+                role: req.user.role,
                 watchlist: newProfile.watchlist
             });
         }
@@ -127,6 +128,7 @@ app.get('/profile', verifyToken, async (req, res) => {
             username: profile.username,
             fullName: profile.fullName,
             avatar: profile.avatar,
+            role: req.user.role,
             watchlist: profile.watchlist
         });
     } catch (err) {
@@ -206,6 +208,7 @@ app.patch('/profile', verifyToken, async (req, res) => {
             username: profile.username,
             fullName: profile.fullName,
             avatar: profile.avatar,
+            role: req.user.role,
             watchlist: profile.watchlist
         });
     } catch (err) {
