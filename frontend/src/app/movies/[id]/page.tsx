@@ -14,6 +14,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { CommentsSection } from "@/components/CommentsSection";
 import { RatingSection } from "@/components/RatingSection";
+import { ErrorPage } from "@/components/ErrorPage";
 import { Pagination } from "@/components/Pagination";
 import { useAuth } from "@/context/AuthContext";
 import { getAvatarUrl, getApiUrl } from "@/lib/utils";
@@ -306,34 +307,10 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#050510]">
-        <Navbar />
-        <div className="max-w-7xl mx-auto px-4 md:px-8 py-12">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            className="mb-8"
-          >
-            <Link
-              href="/"
-              className="group inline-flex items-center gap-3 px-6 py-3 rounded-xl bg-black/60 backdrop-blur-md border border-cyan-500/30 hover:border-cyan-400/60 transition-all text-cyan-100 hover:text-cyan-300"
-              style={{ boxShadow: '0 0 40px rgba(6, 182, 212, 0.3)' }}
-            >
-              <ArrowLeft className="w-5 h-5 text-cyan-300 group-hover:-translate-x-1 transition-transform duration-300" />
-              <span className="font-medium">Back to Home</span>
-            </Link>
-          </motion.div>
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-red-400 mb-4">
-              Error Loading Movie
-            </h1>
-            <p className="text-cyan-100/60">
-              Failed to fetch movie details. Please try again later.
-            </p>
-          </div>
-        </div>
-      </div>
+      <ErrorPage
+        title="Error Loading Movie"
+        message="Failed to fetch movie details. Please try again later."
+      />
     );
   }
 
