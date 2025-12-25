@@ -66,7 +66,7 @@ export default function SeriesDetail({ params }: { params: Promise<{ id: string 
   const { user, profileData, getIdToken } = useAuth();
 
   const { data, error, isLoading } = useSWR(
-    getApiUrl(`/api/series/content/tv/${resolvedParams.id}`),
+    getApiUrl(`/api/content/series/${resolvedParams.id}`),
     fetcher,
   );
 
@@ -92,7 +92,7 @@ export default function SeriesDetail({ params }: { params: Promise<{ id: string 
 
   // Fetch comments
   const { data: commentsData, mutate: mutateComments } = useSWR(
-    getApiUrl(`/api/comments/${resolvedParams.id}?contentType=series&sortBy=${sortBy}`),
+    getApiUrl(`/api/interactions/comments/${resolvedParams.id}?contentType=tv&sortBy=${sortBy}`),
     fetcher,
   );
 
@@ -177,7 +177,7 @@ export default function SeriesDetail({ params }: { params: Promise<{ id: string 
         },
         body: JSON.stringify({
           contentId: parseInt(resolvedParams.id),
-          contentType: 'series',
+          contentType: 'tv',
           text: commentText.trim(),
         }),
       });
@@ -350,7 +350,7 @@ export default function SeriesDetail({ params }: { params: Promise<{ id: string 
     );
   }
 
-  const series: Series & { videos?: { results: Array<{ id: string; key: string; name: string; site: string; type: string }> } } = data?.data;
+  const series: Series & { videos?: { results: Array<{ id: string; key: string; name: string; site: string; type: string }> } } = data;
 
   // Find the first YouTube trailer
   const trailer = series?.videos?.results?.find(video =>
@@ -361,22 +361,7 @@ export default function SeriesDetail({ params }: { params: Promise<{ id: string 
     return (
       <div className="min-h-screen bg-[#050510]">
         <Navbar />
-        <div className="max-w-7xl mx-auto px-4 md:px-8 py-12">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            className="mb-8"
-          >
-            <Link
-              href="/"
-              className="group inline-flex items-center gap-3 px-6 py-3 rounded-xl bg-black/60 backdrop-blur-md border border-cyan-500/30 hover:border-cyan-400/60 transition-all text-cyan-100 hover:text-cyan-300"
-              style={{ boxShadow: '0 0 40px rgba(6, 182, 212, 0.3)' }}
-            >
-              <ArrowLeft className="w-5 h-5 text-cyan-300 group-hover:-translate-x-1 transition-transform duration-300" />
-              <span className="font-medium">Back to Home</span>
-            </Link>
-          </motion.div>
+        <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-red-400 mb-4">
               Series Not Found
@@ -627,7 +612,7 @@ export default function SeriesDetail({ params }: { params: Promise<{ id: string 
         >
           <RatingSection
             contentId={parseInt(resolvedParams.id)}
-            contentType="series"
+            contentType="tv"
           />
         </motion.section>
 

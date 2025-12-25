@@ -10,7 +10,7 @@ import { getApiUrl } from "@/lib/utils";
 
 interface RatingSectionProps {
   contentId: number;
-  contentType: 'movie' | 'series' | 'anime';
+  contentType: 'movie' | 'tv';
   onOpenLoginModal?: () => void;
 }
 
