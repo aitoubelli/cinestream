@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const swaggerJSDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const dotenv = require('dotenv');
+const { requestLogger, startupLogger } = require('../../shared/logging');
 
 dotenv.config();
 
@@ -14,6 +15,7 @@ const PORT = process.env.PORT || 4005;
 // Middleware
 app.use(helmet());
 app.use(express.json());
+app.use(requestLogger);
 
 // SSE connections: Map<userId, Set<Response>>
 const sseConnections = new Map();
@@ -223,5 +225,5 @@ app.get('/health', (req, res) => {
 connectRabbit();
 
 app.listen(PORT, () => {
-    console.log(`Notification Service running on port ${PORT}`);
+    startupLogger('Notification Service', PORT);
 });

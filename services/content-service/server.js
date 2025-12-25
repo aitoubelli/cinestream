@@ -6,6 +6,7 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const axios = require('axios');
 const mongoose = require('mongoose');
+const { requestLogger, startupLogger } = require('../../shared/logging');
 
 dotenv.config();
 
@@ -21,6 +22,7 @@ const PORT = process.env.PORT || 4003;
 // Middleware
 app.use(helmet());
 app.use(express.json());
+app.use(requestLogger);
 
 // Redis client
 const redisClient = redis.createClient({ url: process.env.REDIS_URL });
@@ -1220,5 +1222,5 @@ app.get('/health', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Content Service running on port ${PORT}`);
+    startupLogger('Content Service', PORT);
 });

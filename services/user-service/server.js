@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const swaggerJSDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const dotenv = require('dotenv');
+const { requestLogger, startupLogger } = require('../../shared/logging');
 
 dotenv.config();
 
@@ -14,6 +15,7 @@ const PORT = process.env.PORT || 4002;
 // Middleware
 app.use(helmet());
 app.use(express.json());
+app.use(requestLogger);
 
 // MongoDB connection
 mongoose.connect(process.env.MONGO_URI, {
@@ -404,5 +406,5 @@ app.get('/health', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`User Service running on port ${PORT}`);
+    startupLogger('User Service', PORT);
 });

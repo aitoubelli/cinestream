@@ -7,6 +7,7 @@ const cookieParser = require('cookie-parser');
 const swaggerJSDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const dotenv = require('dotenv');
+const { requestLogger, startupLogger } = require('../../shared/logging');
 
 dotenv.config();
 
@@ -14,10 +15,7 @@ const app = express();
 const PORT = process.env.PORT || 4001;
 
 // Middleware
-app.use((req, res, next) => {
-    console.log(`Auth Service: ${req.method} ${req.url} from ${req.ip}`);
-    next();
-});
+app.use(requestLogger);
 app.use(helmet());
 app.use(express.json());
 app.use(cookieParser());
@@ -639,5 +637,5 @@ app.get('/health', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Auth Service running on port ${PORT}`);
+    startupLogger('Auth Service', PORT);
 });

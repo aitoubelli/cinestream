@@ -6,6 +6,7 @@ const helmet = require('helmet');
 const swaggerJSDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const dotenv = require('dotenv');
+const { requestLogger, startupLogger } = require('../../shared/logging');
 
 dotenv.config();
 
@@ -15,6 +16,7 @@ const PORT = process.env.PORT || 4004;
 // Middleware
 app.use(helmet());
 app.use(express.json());
+app.use(requestLogger);
 
 // MongoDB connection
 mongoose.connect(process.env.MONGO_URI || 'mongodb://mongodb:27017/cinestream_interactions', {
@@ -603,5 +605,5 @@ app.get('/health', (req, res) => {
 connectRabbit();
 
 app.listen(PORT, () => {
-    console.log(`Interaction Service running on port ${PORT}`);
+    startupLogger('Interaction Service', PORT);
 });

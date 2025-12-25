@@ -2,16 +2,14 @@ const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const helmet = require('helmet');
+const { requestLogger, startupLogger } = require('../../shared/logging');
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use((req, res, next) => {
-    console.log(`API Gateway: ${req.method} ${req.url} from ${req.ip}`);
-    next();
-});
+app.use(requestLogger);
 
 app.use(cors({
     origin: function (origin, callback) {
@@ -35,5 +33,5 @@ app.get('/health', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`API Gateway running on port ${PORT}`);
+    startupLogger('API Gateway', PORT);
 });
