@@ -173,6 +173,56 @@ app.patch('/profile', verifyToken, async (req, res) => {
 /**
  * @swagger
  * /watchlist:
+ *   get:
+ *     summary: Get user watchlist
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Watchlist retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 watchlist:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/WatchlistItem'
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Profile not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+app.get('/watchlist', verifyToken, async (req, res) => {
+    try {
+        const profile = await UserProfile.findOne({ userId: req.user.id });
+        if (!profile) return res.status(404).json({ error: 'Profile not found' });
+
+        res.json({ watchlist: profile.watchlist });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * @swagger
+ * /watchlist:
  *   post:
  *     summary: Add item to watchlist
  *     tags: [User]

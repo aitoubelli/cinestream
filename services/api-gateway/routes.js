@@ -41,7 +41,16 @@ module.exports = (app) => {
     app.use('/api/watchlist', createProxyMiddleware({
         target: 'http://localhost:4002',
         changeOrigin: true,
-        pathRewrite: { '^/api/watchlist': '/watchlist' }
+        pathRewrite: { '^/api/watchlist': '/watchlist' },
+        onProxyReq: (proxyReq, req, res) => {
+            // Ensure content-type is preserved and body is forwarded for POST/PUT/PATCH
+            if ((req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') && req.body) {
+                const bodyData = JSON.stringify(req.body);
+                proxyReq.setHeader('Content-Type', 'application/json');
+                proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+                proxyReq.write(bodyData);
+            }
+        },
     }));
     app.use('/api/interactions', createProxyMiddleware({
         target: 'http://localhost:4004',

@@ -50,10 +50,15 @@ export function MovieCard({ movie, index, category = 'movies', enableWatchlistTo
 
   const routePath = getRoutePath();
 
+  const { getIdToken } = useAuth();
+
   // Fetch watchlist if user is authenticated and watchlist toggle is enabled
-  const authenticatedFetcher = async (url: string, user: any) => {
+  const authenticatedFetcher = async (url: string, getIdToken: () => Promise<string | null>) => {
+    const token = await getIdToken();
     const response = await fetch(url, {
-      credentials: 'include', // Include cookies for auth
+      headers: {
+        ...(token && { 'Authorization': `Bearer ${token}` }),
+      },
     });
     if (!response.ok) throw new Error('Failed to fetch watchlist');
     return response.json();
@@ -61,10 +66,10 @@ export function MovieCard({ movie, index, category = 'movies', enableWatchlistTo
 
   const { data: watchlistData, mutate: mutateWatchlist } = useSWR(
     user && enableWatchlistToggle ? `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/watchlist` : null,
-    (url: string) => authenticatedFetcher(url, user)
+    (url: string) => authenticatedFetcher(url, getIdToken)
   );
 
-  const isInWatchlist = watchlistData?.movieIds?.includes(movie.id) ?? false;
+  const isInWatchlist = watchlistData?.watchlist?.some((item: any) => item.contentId === movie.id && item.contentType === (category === 'movies' ? 'movie' : 'tv')) ?? false;
 
   const toggleWatchlist = async () => {
     if (!user) {
@@ -74,27 +79,29 @@ export function MovieCard({ movie, index, category = 'movies', enableWatchlistTo
 
     const previousWatchlist = watchlistData;
     const newIsInWatchlist = !isInWatchlist;
+    const contentType = category === 'movies' ? 'movie' : 'tv';
 
     // Optimistic update
     mutateWatchlist(
       {
-        movieIds: newIsInWatchlist
-          ? [...(watchlistData?.movieIds || []), movie.id]
-          : (watchlistData?.movieIds || []).filter((id: number) => id !== movie.id)
+        watchlist: newIsInWatchlist
+          ? [...(watchlistData?.watchlist || []), { contentId: movie.id, contentType }]
+          : (watchlistData?.watchlist || []).filter((item: any) => !(item.contentId === movie.id && item.contentType === contentType))
       },
       false
     );
 
     try {
+      const token = await getIdToken();
       const response = await fetch(
         newIsInWatchlist ? `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/watchlist` : `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/watchlist/${movie.id}`,
         {
           method: newIsInWatchlist ? 'POST' : 'DELETE',
           headers: {
             'Content-Type': 'application/json',
+            ...(token && { 'Authorization': `Bearer ${token}` }),
           },
-          credentials: 'include', // Include cookies for auth
-          body: newIsInWatchlist ? JSON.stringify({ movieId: movie.id }) : undefined,
+          body: newIsInWatchlist ? JSON.stringify({ contentId: movie.id, contentType }) : undefined,
         }
       );
 

@@ -10,11 +10,11 @@ import { Footer } from "@/components/Footer";
 import { useAuth } from "@/context/AuthContext";
 import { Card } from "@/components/ui/card";
 
-const authenticatedFetcher = async (url: string, user: any) => {
-  const idToken = await user.getIdToken();
+const authenticatedFetcher = async (url: string, getIdToken: () => Promise<string | null>) => {
+  const idToken = await getIdToken();
   const response = await fetch(url, {
     headers: {
-      'Authorization': `Bearer ${idToken}`,
+      ...(idToken && { 'Authorization': `Bearer ${idToken}` }),
     },
   });
   return response.json();
@@ -28,7 +28,7 @@ const genreMap: { [key: number]: string } = {
 };
 
 export default function WatchlistPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, getIdToken } = useAuth();
   const router = useRouter();
 
   // Redirect if not logged in
@@ -38,35 +38,37 @@ export default function WatchlistPage() {
     }
   }, [user, authLoading, router]);
 
-  // Fetch watchlist movie IDs
+  // Fetch watchlist items
   const { data: watchlistData, error: watchlistError, isLoading: watchlistLoading } = useSWR(
     user ? `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/watchlist` : null,
-    (url: string) => authenticatedFetcher(url, user)
+    (url: string) => authenticatedFetcher(url, getIdToken)
   );
 
-  const movieIds = watchlistData?.movieIds || [];
+  const watchlistItems = watchlistData?.watchlist || [];
 
-  // Fetch full movie data for each movie ID
-  const { data: moviesData, error: moviesError, isLoading: moviesLoading } = useSWR(
-    movieIds.length > 0 ? movieIds.map((id: number) => `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/movies/${id}`) : null,
+  // Fetch full content data for each watchlist item
+  const { data: contentData, error: contentError, isLoading: contentLoading } = useSWR(
+    watchlistItems.length > 0 ? watchlistItems.map((item: any) => `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/content/${item.contentType === 'movie' ? 'movies' : item.contentType}/${item.contentId}`) : null,
     async (urls: string[]) => {
       const responses = await Promise.all(urls.map(url => fetch(url)));
       const data = await Promise.all(responses.map(res => res.json()));
 
       // Transform TMDB data to MovieCard format
-      return data.map((response, index) => {
-        if (!response.success) return null;
-
-        const movie = response.data;
+      return data.map((content, index) => {
+        const item = watchlistItems[index];
+        const isMovie = content.title !== undefined;
         return {
-          id: movie.id,
-          title: movie.title,
-          poster: movie.poster_path
-            ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
+          id: content.id,
+          title: isMovie ? content.title : content.name,
+          poster: content.poster_path
+            ? `https://image.tmdb.org/t/p/w500${content.poster_path}`
             : 'https://via.placeholder.com/500x750?text=No+Image',
-          rating: movie.vote_average,
-          year: movie.release_date ? new Date(movie.release_date).getFullYear().toString() : '2024',
-          genres: movie.genres?.slice(0, 2).map((genre: any) => genre.name) || ['Unknown'],
+          rating: content.vote_average,
+          year: isMovie
+            ? (content.release_date ? new Date(content.release_date).getFullYear().toString() : '2024')
+            : (content.first_air_date ? new Date(content.first_air_date).getFullYear().toString() : '2024'),
+          genres: content.genres?.slice(0, 2).map((genre: any) => genre.name) || ['Unknown'],
+          category: item.contentType === 'movie' ? 'movies' : 'series'
         };
       }).filter(Boolean);
     }
@@ -96,9 +98,9 @@ export default function WatchlistPage() {
     return null;
   }
 
-  const isLoading = watchlistLoading || moviesLoading;
-  const error = watchlistError || moviesError;
-  const movies = moviesData || [];
+  const isLoading = watchlistLoading || contentLoading;
+  const error = watchlistError || contentError;
+  const movies = contentData || [];
 
   return (
     <div className="min-h-screen bg-[#050510]">
@@ -111,7 +113,7 @@ export default function WatchlistPage() {
               My Watchlist
             </h1>
             <p className="text-lg text-cyan-100/60">
-              Your personal collection of movies to watch
+              Your personal collection of movies and TV shows to watch
             </p>
           </div>
 
@@ -174,7 +176,7 @@ export default function WatchlistPage() {
                   key={movie.id}
                   movie={movie}
                   index={index}
-                  category="movies"
+                  category={movie.category}
                   enableWatchlistToggle={true}
                 />
               ))}

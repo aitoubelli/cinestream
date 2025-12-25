@@ -62,7 +62,7 @@ export default function SeriesDetail({ params }: { params: Promise<{ id: string 
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyText, setReplyText] = useState('');
   const [expandedComments, setExpandedComments] = useState<Set<number>>(new Set());
-  const { user, profileData } = useAuth();
+  const { user, profileData, getIdToken } = useAuth();
 
   const { data, error, isLoading } = useSWR(
     getApiUrl(`/api/series/content/tv/${resolvedParams.id}`),
@@ -72,11 +72,11 @@ export default function SeriesDetail({ params }: { params: Promise<{ id: string 
 
 
   // Authenticated fetcher for watchlist
-  const authenticatedFetcher = async (url: string, user: any) => {
-    const idToken = await user.getIdToken();
+  const authenticatedFetcher = async (url: string, getIdToken: () => Promise<string | null>) => {
+    const idToken = await getIdToken();
     const response = await fetch(url, {
       headers: {
-        'Authorization': `Bearer ${idToken}`,
+        ...(idToken && { 'Authorization': `Bearer ${idToken}` }),
       },
     });
     if (!response.ok) throw new Error('Failed to fetch watchlist');
@@ -86,7 +86,7 @@ export default function SeriesDetail({ params }: { params: Promise<{ id: string 
   // Fetch watchlist if user is authenticated
   const { data: watchlistData, mutate: mutateWatchlist } = useSWR(
     user ? getApiUrl('/api/watchlist') : null,
-    (url: string) => authenticatedFetcher(url, user)
+    (url: string) => authenticatedFetcher(url, getIdToken)
   );
 
   // Fetch comments
@@ -95,7 +95,7 @@ export default function SeriesDetail({ params }: { params: Promise<{ id: string 
     fetcher,
   );
 
-  const isInWatchlist = watchlistData?.movieIds?.includes(parseInt(resolvedParams.id)) ?? false;
+  const isInWatchlist = watchlistData?.watchlist?.some((item: any) => item.contentId === parseInt(resolvedParams.id) && item.contentType === 'tv') ?? false;
 
   const toggleWatchlist = async () => {
     if (!user) {
@@ -109,24 +109,24 @@ export default function SeriesDetail({ params }: { params: Promise<{ id: string 
     // Optimistic update
     mutateWatchlist(
       {
-        movieIds: newIsInWatchlist
-          ? [...(watchlistData?.movieIds || []), parseInt(resolvedParams.id)]
-          : (watchlistData?.movieIds || []).filter((id: number) => id !== parseInt(resolvedParams.id))
+        watchlist: newIsInWatchlist
+          ? [...(watchlistData?.watchlist || []), { contentId: parseInt(resolvedParams.id), contentType: 'tv' }]
+          : (watchlistData?.watchlist || []).filter((item: any) => !(item.contentId === parseInt(resolvedParams.id) && item.contentType === 'tv'))
       },
       false
     );
 
     try {
-      const idToken = await user.getIdToken();
+      const idToken = await getIdToken();
       const response = await fetch(
         newIsInWatchlist ? getApiUrl('/api/watchlist') : getApiUrl(`/api/watchlist/${resolvedParams.id}`),
         {
           method: newIsInWatchlist ? 'POST' : 'DELETE',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${idToken}`,
+            ...(idToken && { 'Authorization': `Bearer ${idToken}` }),
           },
-          body: newIsInWatchlist ? JSON.stringify({ movieId: parseInt(resolvedParams.id) }) : undefined,
+          body: newIsInWatchlist ? JSON.stringify({ contentId: parseInt(resolvedParams.id), contentType: 'tv' }) : undefined,
         }
       );
 
