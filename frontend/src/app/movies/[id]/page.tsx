@@ -5,8 +5,8 @@ import useSWR from "swr";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { Play, Plus, Share2, Star, Clock, Calendar, ThumbsUp, ArrowLeft } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Play, Plus, Share2, Star, Clock, Calendar, ThumbsUp, ArrowLeft, X, Copy, Check, CheckCircle2 } from "lucide-react";
 import { ImageWithFallback } from "@/components/ImageWithFallback";
 import { MovieCard } from "@/components/MovieCard";
 import { TrailerModal } from "@/components/TrailerModal";
@@ -69,6 +69,8 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
   const [commentsPage, setCommentsPage] = useState(1);
   const [editingComment, setEditingComment] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [copied, setCopied] = useState(false);
   const { user, profileData, getIdToken } = useAuth();
 
   const { data, error, isLoading } = useSWR(
@@ -151,6 +153,18 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
       mutateWatchlist(previousWatchlist, false);
       toast.error('Failed to update watchlist. Please try again.');
     }
+  };
+
+  const handleShare = () => {
+    setShowShareModal(true);
+  };
+
+  const copyToClipboard = () => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    toast.success('Link copied to clipboard');
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleSortChange = (sort: 'newest' | 'top') => {
@@ -385,19 +399,6 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
               <span className="font-medium">Back to Home</span>
             </Link>
           </motion.div>
-          <div className="animate-pulse">
-            <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-8 mb-16">
-              <div className="w-full aspect-[2/3] bg-gray-700 rounded-2xl"></div>
-              <div className="space-y-8">
-                <div className="space-y-4">
-                  <div className="h-12 bg-gray-700 rounded w-3/4"></div>
-                  <div className="h-6 bg-gray-700 rounded w-1/4"></div>
-                  <div className="h-4 bg-gray-700 rounded"></div>
-                  <div className="h-4 bg-gray-700 rounded w-5/6"></div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     );
@@ -471,6 +472,77 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
   return (
     <div className="min-h-screen bg-[#050510]">
       <Navbar />
+
+      {/* Share Modal */}
+      <AnimatePresence>
+        {showShareModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowShareModal(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100]"
+            />
+            <div className="fixed inset-0 flex items-center justify-center z-[101] p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="w-full max-w-md bg-[#0a0a1a] border border-cyan-500/30 rounded-2xl p-6 shadow-2xl relative overflow-hidden"
+              >
+                {/* Glow Background */}
+                <div className="absolute -top-24 -left-24 w-48 h-48 bg-cyan-500/10 blur-[80px] pointer-events-none" />
+                <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-violet-500/10 blur-[80px] pointer-events-none" />
+
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-cyan-100 flex items-center gap-2">
+                    <Share2 className="w-5 h-5" />
+                    Share {movie?.title || 'Content'}
+                  </h3>
+                  <button
+                    onClick={() => setShowShareModal(false)}
+                    className="p-1 rounded-full hover:bg-white/10 transition-colors"
+                  >
+                    <X className="w-5 h-5 text-cyan-100/60" />
+                  </button>
+                </div>
+
+                <p className="text-cyan-100/60 text-sm mb-4">
+                  Copy the link below to share this movie with your friends.
+                </p>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={typeof window !== 'undefined' ? window.location.href : ''}
+                    className="flex-1 bg-black/40 border border-cyan-500/20 rounded-xl px-4 py-3 text-sm text-cyan-300 outline-none hover:border-cyan-500/40 transition-all font-mono truncate"
+                  />
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={copyToClipboard}
+                    className="px-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30 hover:bg-cyan-500/20 text-cyan-300 transition-all flex items-center justify-center min-w-[50px]"
+                  >
+                    {copied ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5" />}
+                  </motion.button>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={() => setShowShareModal(false)}
+                    className="px-6 py-2 rounded-xl bg-cyan-500/10 text-cyan-300 text-sm font-medium hover:bg-cyan-500/20 transition-all"
+                  >
+                    Close
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-12" style={{ paddingTop: '120px' }}>
 
@@ -529,18 +601,19 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
                     whileTap={{ scale: 0.98 }}
                     onClick={toggleWatchlist}
                     className={`px-4 py-3 rounded-xl backdrop-blur-sm border transition-all flex items-center justify-center gap-2 ${isInWatchlist
-                        ? 'bg-red-500/20 border-red-500/50 hover:border-red-400/70 text-red-100'
-                        : 'bg-black/60 border-cyan-500/30 hover:border-cyan-400/60 text-cyan-100'
+                      ? 'bg-red-500/10 border-red-500/40 text-red-400 hover:border-red-400/60'
+                      : 'bg-cyan-500/10 border-cyan-500/30 hover:border-cyan-400/60 text-cyan-300'
                       }`}
                   >
-                    <Plus className={`w-5 h-5 ${isInWatchlist ? 'rotate-45' : ''} transition-transform duration-200`} />
-                    <span>{isInWatchlist ? 'In List' : 'My List'}</span>
+                    {isInWatchlist ? <CheckCircle2 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                    <span>{isInWatchlist ? 'In My List' : 'My List'}</span>
                   </motion.button>
 
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className="px-4 py-3 rounded-xl bg-black/60 backdrop-blur-sm border border-violet-500/30 hover:border-violet-400/60 transition-all text-violet-100 flex items-center justify-center gap-2"
+                    onClick={handleShare}
+                    className="px-4 py-3 rounded-xl bg-violet-500/10 border border-violet-500/30 hover:border-violet-400/60 text-violet-300 flex items-center justify-center gap-2 transition-all"
                   >
                     <Share2 className="w-5 h-5" />
                     <span>Share</span>

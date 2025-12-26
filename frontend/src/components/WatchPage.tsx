@@ -6,6 +6,8 @@ import { VideoPlayer } from './VideoPlayer';
 import useSWR, { mutate } from 'swr';
 import { getApiUrl } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
+import { toast } from 'sonner';
+import { Check, Copy } from 'lucide-react';
 
 interface WatchPageProps {
   contentId: number;
@@ -45,6 +47,8 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
   const [episodeSearch, setEpisodeSearch] = useState('');
   const [startPlaying, setStartPlaying] = useState(false);
   const [videoTime, setVideoTime] = useState(0);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [copied, setCopied] = useState(false);
   const { user, getIdToken } = useAuth();
 
   // Auto-resume for Series: fetching the absolute latest watched episode
@@ -101,6 +105,74 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
       setVideoTime(progressData.progressSeconds || 0);
     }
   }, [progressData, contentId, contentType, selectedSeason, selectedEpisode]); // Added dependencies to reset on episode change logic
+
+  // Watchlist integration
+  const { data: watchlistData, mutate: mutateWatchlist } = useSWR(
+    user ? getApiUrl('/api/watchlist') : null,
+    async (url: string) => {
+      const token = await getIdToken();
+      if (!token) return { watchlist: [] };
+      return authenticatedFetcher(url, token);
+    }
+  );
+
+  const isInWatchlist = watchlistData?.watchlist?.some(
+    (item: any) => item.contentId === contentId && item.contentType === (contentType === 'series' ? 'tv' : 'movie')
+  ) ?? false;
+
+  const toggleWatchlist = async () => {
+    if (!user) {
+      toast.error('Please sign in to manage your watchlist');
+      return;
+    }
+
+    const previousWatchlist = watchlistData;
+    const newIsInWatchlist = !isInWatchlist;
+    const backendContentType = contentType === 'series' ? 'tv' : 'movie';
+
+    // Optimistic update
+    mutateWatchlist(
+      {
+        watchlist: newIsInWatchlist
+          ? [...(watchlistData?.watchlist || []), { contentId, contentType: backendContentType }]
+          : (watchlistData?.watchlist || []).filter((item: any) => !(item.contentId === contentId && item.contentType === backendContentType))
+      },
+      false
+    );
+
+    try {
+      const token = await getIdToken();
+      const response = await fetch(
+        newIsInWatchlist ? getApiUrl('/api/watchlist') : getApiUrl(`/api/watchlist/${contentId}`),
+        {
+          method: newIsInWatchlist ? 'POST' : 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: newIsInWatchlist ? JSON.stringify({ contentId, contentType: backendContentType }) : undefined,
+        }
+      );
+
+      if (!response.ok) throw new Error('Failed to update watchlist');
+      toast.success(newIsInWatchlist ? 'Added to watchlist' : 'Removed from watchlist');
+    } catch (error) {
+      mutateWatchlist(previousWatchlist, false);
+      toast.error('Failed to update watchlist');
+    }
+  };
+
+  const handleShare = () => {
+    setShowShareModal(true);
+  };
+
+  const copyToClipboard = () => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    toast.success('Link copied to clipboard');
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const lastSaveTimeRef = useRef(0);
   const saveProgress = useCallback(async (time: number, duration: number) => {
@@ -297,6 +369,76 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
                   <div className="relative">
                     <VideoPlayer key={`${contentType}-${contentId}-${selectedSeason}-${selectedEpisode}`} src={videoUrl} poster={videoPoster} contentId={contentId} contentType={contentType} selectedSeason={selectedSeason} selectedEpisode={selectedEpisode} initialTime={videoTime} onTimeUpdate={handleTimeUpdate} startPlaying={startPlaying} onEnded={handleEnded} onStartedPlaying={() => setStartPlaying(false)} title={displayTitle} overview={overview} rating={rating} year={releaseYear} runtime={runtime} />
                   </div>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Share Modal */}
+      <AnimatePresence>
+        {showShareModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowShareModal(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100]"
+            />
+            <div className="fixed inset-0 flex items-center justify-center z-[101] p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="w-full max-w-md bg-[#0a0a1a] border border-cyan-500/30 rounded-2xl p-6 shadow-2xl relative overflow-hidden"
+              >
+                {/* Glow Background */}
+                <div className="absolute -top-24 -left-24 w-48 h-48 bg-cyan-500/10 blur-[80px] pointer-events-none" />
+                <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-violet-500/10 blur-[80px] pointer-events-none" />
+
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-cyan-100 flex items-center gap-2">
+                    <Share2 className="w-5 h-5" />
+                    Share Content
+                  </h3>
+                  <button
+                    onClick={() => setShowShareModal(false)}
+                    className="p-1 rounded-full hover:bg-white/10 transition-colors"
+                  >
+                    <X className="w-5 h-5 text-cyan-100/60" />
+                  </button>
+                </div>
+
+                <p className="text-cyan-100/60 text-sm mb-4">
+                  Copy the link below to share this {contentType === 'series' ? 'series' : 'movie'} with your friends.
+                </p>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={typeof window !== 'undefined' ? window.location.href : ''}
+                    className="flex-1 bg-black/40 border border-cyan-500/20 rounded-xl px-4 py-3 text-sm text-cyan-300 outline-none hover:border-cyan-500/40 transition-all font-mono truncate"
+                  />
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={copyToClipboard}
+                    className="px-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30 hover:bg-cyan-500/20 text-cyan-300 transition-all flex items-center justify-center min-w-[50px]"
+                  >
+                    {copied ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5" />}
+                  </motion.button>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={() => setShowShareModal(false)}
+                    className="px-6 py-2 rounded-xl bg-cyan-500/10 text-cyan-300 text-sm font-medium hover:bg-cyan-500/20 transition-all"
+                  >
+                    Close
+                  </button>
                 </div>
               </motion.div>
             </div>
@@ -654,14 +796,19 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="px-6 py-2.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 hover:border-cyan-400/60 text-cyan-300 flex items-center gap-2 transition-all"
+              onClick={toggleWatchlist}
+              className={`px-6 py-2.5 rounded-lg border transition-all flex items-center gap-2 ${isInWatchlist
+                ? 'bg-red-500/10 border-red-500/40 text-red-400'
+                : 'bg-cyan-500/10 border-cyan-500/30 hover:border-cyan-400/60 text-cyan-300'
+                }`}
             >
-              <Plus className="w-5 h-5" />
-              My List
+              {isInWatchlist ? <CheckCircle2 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+              {isInWatchlist ? 'In My List' : 'My List'}
             </motion.button>
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
+              onClick={handleShare}
               className="px-6 py-2.5 rounded-lg bg-violet-500/10 border border-violet-500/30 hover:border-violet-400/60 text-violet-300 flex items-center gap-2 transition-all"
             >
               <Share2 className="w-5 h-5" />
