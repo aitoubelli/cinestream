@@ -747,6 +747,8 @@ app.get('/continue-watching', verifyToken, async (req, res) => {
                     first_air_date: content.first_air_date,
                     genre_ids: content.genres ? content.genres.map(g => g.id) : [],
                     progress: item.durationSeconds > 0 ? (item.progressSeconds / item.durationSeconds) * 100 : 0,
+                    progressSeconds: item.progressSeconds,
+                    durationSeconds: item.durationSeconds,
                     contentType: item.contentType,
                     // Extra fields for Series display
                     seasonNumber: item.seasonNumber,

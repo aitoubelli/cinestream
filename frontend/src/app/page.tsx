@@ -58,6 +58,8 @@ interface ContentItem {
   seasonNumber?: number;
   episodeNumber?: number;
   episodeName?: string;
+  progressSeconds?: number;
+  durationSeconds?: number;
 }
 
 export default function Home() {
@@ -138,12 +140,22 @@ export default function Home() {
     contentType: activeCategory === 'movies' ? 'movie' : 'tv'
   });
 
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    if (h > 0) {
+      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
   // Transform continue watching data
   const continueWatchingMovies = continueWatchingData?.results?.slice(0, 6).map((item: ContentItem) => ({
     id: item.id,
-    title: item.contentType === 'tv' && item.seasonNumber
-      ? `${item.name || item.title} S${item.seasonNumber}E${item.episodeNumber}${item.episodeName ? `: ${item.episodeName}` : ''}`
-      : item.title || item.name || 'Unknown Title',
+    title: item.contentType === 'tv'
+      ? (item.name || item.title || 'Unknown Series')
+      : (item.title || item.name || 'Unknown Title'),
     poster: item.poster_path && item.poster_path.startsWith('http')
       ? item.poster_path
       : (item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : '/fallback-poster.svg'),
@@ -153,6 +165,9 @@ export default function Home() {
     genres: ['Action', 'Sci-Fi'], // TODO: Map genre_ids to actual genre names
     progress: item.progress,
     contentType: item.contentType, // Preserve content type from backend
+    formattedProgress: formatTime(item.progressSeconds || 0),
+    seasonEpisodeLabel: item.contentType === 'tv' && item.seasonNumber ? `S${item.seasonNumber}E${item.episodeNumber}` : undefined,
+    episodeName: item.episodeName
   })) || [];
 
 

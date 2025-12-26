@@ -19,6 +19,9 @@ interface MovieCardProps {
     genres: string[];
     progress?: number; // For continue watching (0-100)
     contentType?: string; // For continue watching ('movie', 'tv', 'anime')
+    formattedProgress?: string;
+    seasonEpisodeLabel?: string;
+    episodeName?: string;
   };
   index: number;
   category?: 'movies' | 'series' | 'anime';
@@ -205,26 +208,57 @@ export function MovieCard({ movie, index, category = 'movies', enableWatchlistTo
             initial={false}
             animate={{ opacity: isHovered ? 1 : 0 }}
             transition={{ duration: 0.3 }}
-            className="absolute inset-0 flex flex-col justify-end p-5"
+            className="absolute inset-0 flex flex-col justify-end p-4"
           >
-            {/* Play Button */}
+            {/* Play Button - Centered when hovered */}
             <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: isHovered ? 1 : 0 }}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: isHovered ? 1 : 0, opacity: isHovered ? 1 : 0 }}
               transition={{ duration: 0.3, type: 'spring', stiffness: 200 }}
               className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
             >
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 flex items-center justify-center"
-                style={{ boxShadow: '0 0 40px rgba(6, 182, 212, 0.6)' }}
-              >
-                <Play className="w-7 h-7 text-white fill-white ml-1" />
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+                <Play className="w-6 h-6 text-white fill-white ml-1" />
               </div>
             </motion.div>
 
             {/* Movie Info */}
-            <div className="space-y-2">
-              <h3 className="text-white line-clamp-2">{movie.title}</h3>
-              <div className="flex items-center gap-2 text-sm text-cyan-200/80">
+            <div className="space-y-1 relative z-20">
+              <h3 className="text-white line-clamp-1 font-semibold text-sm md:text-base leading-tight drop-shadow-md">
+                {movie.title}
+              </h3>
+
+              {showProgress ? (
+                <>
+                  {/* Render logic for Continue Watching / History */}
+                  {movie.contentType === 'movie' ? (
+                    /* Movie: Show Progress Time */
+                    <div className="text-cyan-300 text-xs font-medium">
+                      {movie.formattedProgress || 'Resume'}
+                    </div>
+                  ) : (
+                    /* Series: Show SxxExx + Time + Episode Name */
+                    <>
+                      <div className="flex items-center gap-2 text-cyan-300 text-xs font-medium">
+                        <span>{movie.seasonEpisodeLabel}</span>
+                        {movie.formattedProgress && (
+                          <>
+                            <span className="text-cyan-200/40">•</span>
+                            <span>{movie.formattedProgress}</span>
+                          </>
+                        )}
+                      </div>
+                      {movie.episodeName && (
+                        <div className="text-cyan-100/80 text-xs line-clamp-1 font-light">
+                          {movie.episodeName}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              ) : null}
+
+              <div className="flex items-center gap-2 text-xs text-cyan-200/60 pt-1">
                 <span>{movie.year}</span>
                 <span>•</span>
                 <span className="line-clamp-1">{movie.genres.join(', ')}</span>

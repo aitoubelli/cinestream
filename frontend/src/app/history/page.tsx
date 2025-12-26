@@ -23,6 +23,16 @@ const authenticatedFetcher = async (url: string, token: string) => {
 
 type FilterType = 'all' | 'completed' | 'in-progress';
 
+const formatTime = (seconds: number) => {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) {
+    return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  }
+  return `${m}:${s.toString().padStart(2, '0')}`;
+};
+
 export default function HistoryPage() {
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const { user, getIdToken } = useAuth();
@@ -131,9 +141,9 @@ export default function HistoryPage() {
                 progress: progressPercent,
                 contentType: contentType,
                 // Extra info
-                seasonNumber: latestItem.seasonNumber,
-                episodeNumber: latestItem.episodeNumber,
-                episodeName: displayEpisodeName,
+                formattedProgress: formatTime(contentType === 'movie' ? items[0].progressSeconds : latestItem.progressSeconds),
+                seasonEpisodeLabel: contentType === 'tv' && latestItem.seasonNumber ? `S${latestItem.seasonNumber}E${latestItem.episodeNumber}` : undefined,
+                episodeName: displayEpisodeName.includes(': ') ? displayEpisodeName.split(': ')[1] : undefined,
                 isCompleted // Internal flag
               };
             }
