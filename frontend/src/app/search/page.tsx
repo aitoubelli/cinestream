@@ -100,7 +100,7 @@ function SearchPageContent() {
             transition={{ duration: 0.6 }}
             className="text-center mb-12"
           >
-            <h1 className="text-4xl md:text-5xl bg-gradient-to-r from-cyan-300 to-violet-300 bg-clip-text text-transparent inline-block relative mb-6">
+            <h1 className="text-4xl md:text-5xl bg-gradient-to-r from-cyan-300 to-violet-300 bg-clip-text text-transparent inline-block relative mb-6 pb-2">
               Search Movies
               <div
                 className="absolute -bottom-2 left-0 h-1 w-32 bg-gradient-to-r from-cyan-400 to-violet-400 rounded-full mx-auto"

@@ -118,7 +118,7 @@ export function Hero({ movies, category = 'movies', error, autoPlay = true, auto
             </div>
 
             {/* Placeholder Title */}
-            <h1 className="text-5xl md:text-7xl mb-6 bg-gradient-to-r from-gray-300 via-white to-gray-300 bg-clip-text text-transparent">
+            <h1 className="text-5xl md:text-7xl mb-6 bg-gradient-to-r from-gray-300 via-white to-gray-300 bg-clip-text text-transparent pb-4">
               {error ? 'Content Loading...' : 'Coming Soon'}
             </h1>
 
@@ -231,7 +231,7 @@ export function Hero({ movies, category = 'movies', error, autoPlay = true, auto
 
             {/* Title - Clickable */}
             <h1
-              className="text-5xl md:text-7xl mb-6 bg-gradient-to-r from-cyan-200 via-white to-violet-200 bg-clip-text text-transparent cursor-pointer hover:from-cyan-300 hover:via-cyan-100 hover:to-violet-300 transition-all duration-300 line-clamp-2"
+              className="text-5xl md:text-7xl mb-6 bg-gradient-to-r from-cyan-200 via-white to-violet-200 bg-clip-text text-transparent cursor-pointer hover:from-cyan-300 hover:via-cyan-100 hover:to-violet-300 transition-all duration-300 line-clamp-2 pb-4"
               onClick={() => window.location.href = `/${routePath}/${currentMovie.id || 1}`}
             >
               {currentMovie.title}
@@ -259,38 +259,7 @@ export function Hero({ movies, category = 'movies', error, autoPlay = true, auto
               {currentMovie.description}
             </p>
 
-            {/* CTA Buttons */}
-            <div className="flex flex-wrap gap-4">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="group relative px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 overflow-hidden"
-                style={{ boxShadow: '0 0 40px rgba(6, 182, 212, 0.5)' }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-violet-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="relative flex items-center gap-2 text-white">
-                  <Play className="w-5 h-5 fill-white" />
-                  <span>Watch</span>
-                </div>
-              </motion.button>
 
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.location.href = `/${routePath}/${currentMovie.id || 1}`;
-                }}
-                className="group px-8 py-4 rounded-xl bg-black/40 backdrop-blur-sm border border-cyan-500/30 hover:border-cyan-400/60 transition-all"
-                style={{ boxShadow: '0 0 20px rgba(6, 182, 212, 0.2)' }}
-              >
-                <div className="flex items-center gap-2 text-cyan-100 group-hover:text-cyan-300 transition-colors">
-                  <Info className="w-5 h-5" />
-                  <span>Watch Trailer</span>
-                </div>
-              </motion.button>
-            </div>
           </motion.div>
         </AnimatePresence>
 
@@ -323,19 +292,20 @@ export function Hero({ movies, category = 'movies', error, autoPlay = true, auto
 
       {/* Dot Indicators */}
       {movies.length > 1 && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex space-x-3 z-20">
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex space-x-3 z-30">
           {movies.map((_, index) => (
-            <button
+            <motion.button
               key={index}
+              whileHover={{ scale: 1.3 }}
+              whileTap={{ scale: 0.9 }}
               onClick={(e) => {
                 e.stopPropagation();
                 goToSlide(index);
               }}
-              className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                index === currentIndex
-                  ? 'bg-cyan-400 shadow-lg shadow-cyan-400/50'
+              className={`w-3 h-3 rounded-full transition-all duration-300 cursor-pointer ${index === currentIndex
+                  ? 'bg-cyan-400 shadow-lg shadow-cyan-400/50 scale-110'
                   : 'bg-cyan-600/50 hover:bg-cyan-500/75'
-              }`}
+                }`}
               aria-label={`Go to slide ${index + 1}`}
             />
           ))}
@@ -344,7 +314,7 @@ export function Hero({ movies, category = 'movies', error, autoPlay = true, auto
 
       {/* Bottom Fade */}
       <div
-        className="absolute bottom-0 left-0 right-0 h-32 z-20"
+        className="absolute bottom-0 left-0 right-0 h-32 z-20 pointer-events-none"
         style={{
           background: 'linear-gradient(to top, rgba(5, 5, 16, 1), transparent)'
         }}

@@ -129,31 +129,31 @@ export function BrowsePage() {
         // content-service /search is multi-search.
         // Let's check if there is a search query
         if (filters.search) {
-            // Option A: Use client-side filtering on the results (limited)
-            // Option B: Fetch from /search instead
-            const searchResponse = await fetch(`${getApiUrl('/api/content/search')}?q=${encodeURIComponent(filters.search)}`);
-            const searchData = await searchResponse.json();
-            if (searchData.results) {
-                // Transform search results to MediaItem
-                fetchedResults = searchData.results
-                    .filter((item: any) => item.media_type !== 'person')
-                    .map((item: any) => ({
-                        id: item.id,
-                        title: item.title || item.name,
-                        poster: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null,
-                        rating: item.vote_average,
-                        year: item.release_date ? item.release_date.substring(0, 4) : item.first_air_date ? item.first_air_date.substring(0, 4) : 'N/A',
-                        genres: [], // Search multi doesn't always provide genre names easily
-                        contentType: item.media_type,
-                        original_language: item.original_language,
-                        release_date: item.release_date,
-                        first_air_date: item.first_air_date,
-                        vote_average: item.vote_average
-                    }));
+          // Option A: Use client-side filtering on the results (limited)
+          // Option B: Fetch from /search instead
+          const searchResponse = await fetch(`${getApiUrl('/api/content/search')}?q=${encodeURIComponent(filters.search)}`);
+          const searchData = await searchResponse.json();
+          if (searchData.results) {
+            // Transform search results to MediaItem
+            fetchedResults = searchData.results
+              .filter((item: any) => item.media_type !== 'person')
+              .map((item: any) => ({
+                id: item.id,
+                title: item.title || item.name,
+                poster: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null,
+                rating: item.vote_average,
+                year: item.release_date ? item.release_date.substring(0, 4) : item.first_air_date ? item.first_air_date.substring(0, 4) : 'N/A',
+                genres: [], // Search multi doesn't always provide genre names easily
+                contentType: item.media_type,
+                original_language: item.original_language,
+                release_date: item.release_date,
+                first_air_date: item.first_air_date,
+                vote_average: item.vote_average
+              }));
 
-                // Still apply other filters client-side if they are set
-                fetchedResults = filterResultsClientSide(fetchedResults, filters);
-            }
+            // Still apply other filters client-side if they are set
+            fetchedResults = filterResultsClientSide(fetchedResults, filters);
+          }
         }
 
         // Handle pagination: for search we do client-side, for browse the backend handles it
@@ -199,7 +199,7 @@ export function BrowsePage() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mt-16 mb-8">
-          <h1 className="text-4xl md:text-5xl mb-4 bg-gradient-to-r from-cyan-300 to-violet-300 bg-clip-text text-transparent">
+          <h1 className="text-4xl md:text-5xl mb-4 bg-gradient-to-r from-cyan-300 to-violet-300 bg-clip-text text-transparent pb-3">
             Browse Content
           </h1>
           <p className="text-cyan-100/60">

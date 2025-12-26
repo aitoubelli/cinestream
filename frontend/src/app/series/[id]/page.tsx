@@ -610,7 +610,7 @@ export default function SeriesDetail({ params }: { params: Promise<{ id: string 
           <div className="space-y-8">
             {/* Title and Meta */}
             <div>
-              <h1 className="text-4xl md:text-5xl mb-2 bg-gradient-to-r from-cyan-200 via-white to-violet-200 bg-clip-text text-transparent">
+              <h1 className="text-4xl md:text-5xl mb-2 bg-gradient-to-r from-cyan-200 via-white to-violet-200 bg-clip-text text-transparent pb-3">
                 {series.name}
               </h1>
               <p className="text-lg text-cyan-100/60 mb-4">
@@ -648,7 +648,7 @@ export default function SeriesDetail({ params }: { params: Promise<{ id: string 
 
             {/* Overview */}
             <div>
-              <h2 className="text-2xl mb-4 bg-gradient-to-r from-cyan-300 to-violet-300 bg-clip-text text-transparent">
+              <h2 className="text-2xl mb-4 bg-gradient-to-r from-cyan-300 to-violet-300 bg-clip-text text-transparent pb-1">
                 Overview
               </h2>
               <p className="text-lg text-cyan-100/80 leading-relaxed">
@@ -677,7 +677,7 @@ export default function SeriesDetail({ params }: { params: Promise<{ id: string 
             {/* Top Cast */}
             {topCast.length > 0 && (
               <div>
-                <h2 className="text-2xl mb-6 bg-gradient-to-r from-cyan-300 to-violet-300 bg-clip-text text-transparent">
+                <h2 className="text-2xl mb-6 bg-gradient-to-r from-cyan-300 to-violet-300 bg-clip-text text-transparent pb-1">
                   Top Cast
                 </h2>
                 <div className="grid grid-cols-2 gap-4">

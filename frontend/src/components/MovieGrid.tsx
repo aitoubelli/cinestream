@@ -32,7 +32,7 @@ export function MovieGrid({ title, movies, category = 'movies', enableWatchlistT
           transition={{ duration: 0.6 }}
           className="mb-8"
         >
-          <h2 className="text-3xl md:text-4xl bg-gradient-to-r from-cyan-300 to-violet-300 bg-clip-text text-transparent inline-block relative">
+          <h2 className="text-3xl md:text-4xl bg-gradient-to-r from-cyan-300 to-violet-300 bg-clip-text text-transparent inline-block relative pb-2">
             {title}
             <div
               className="absolute -bottom-2 left-0 h-1 w-20 bg-gradient-to-r from-cyan-400 to-violet-400 rounded-full"

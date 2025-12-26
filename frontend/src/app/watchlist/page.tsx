@@ -109,7 +109,7 @@ export default function WatchlistPage() {
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-12">
-            <h1 className="text-4xl md:text-5xl mb-4 bg-gradient-to-r from-cyan-300 to-violet-300 bg-clip-text text-transparent">
+            <h1 className="text-4xl md:text-5xl mb-4 bg-gradient-to-r from-cyan-300 to-violet-300 bg-clip-text text-transparent pb-3">
               My Watchlist
             </h1>
             <p className="text-lg text-cyan-100/60">
@@ -117,72 +117,72 @@ export default function WatchlistPage() {
             </p>
           </div>
 
-        {/* Error State */}
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-8"
-          >
-            <Card className="p-6 bg-red-500/10 border-red-500/30">
-              <p className="text-red-400">
-                Failed to load watchlist. Please try again later.
-              </p>
-            </Card>
-          </motion.div>
-        )}
+          {/* Error State */}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-8"
+            >
+              <Card className="p-6 bg-red-500/10 border-red-500/30">
+                <p className="text-red-400">
+                  Failed to load watchlist. Please try again later.
+                </p>
+              </Card>
+            </motion.div>
+          )}
 
-        {/* Loading State */}
-        {isLoading && (
-          <div className="animate-pulse">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className="aspect-[2/3] bg-gray-700 rounded-xl"></div>
-              ))}
+          {/* Loading State */}
+          {isLoading && (
+            <div className="animate-pulse">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div key={i} className="aspect-[2/3] bg-gray-700 rounded-xl"></div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Empty State */}
-        {!isLoading && !error && movies.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-center py-16"
-          >
-            <Card className="p-8 bg-black/40 backdrop-blur-sm border-cyan-500/20 max-w-md mx-auto">
-              <div className="text-6xl mb-4">🎬</div>
-              <h2 className="text-2xl font-bold text-cyan-100 mb-2">
-                Your watchlist is empty
-              </h2>
-              <p className="text-cyan-100/60">
-                Start adding movies to keep track of what you want to watch!
-              </p>
-            </Card>
-          </motion.div>
-        )}
+          {/* Empty State */}
+          {!isLoading && !error && movies.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="text-center py-16"
+            >
+              <Card className="p-8 bg-black/40 backdrop-blur-sm border-cyan-500/20 max-w-md mx-auto">
+                <div className="text-6xl mb-4">🎬</div>
+                <h2 className="text-2xl font-bold text-cyan-100 mb-2">
+                  Your watchlist is empty
+                </h2>
+                <p className="text-cyan-100/60">
+                  Start adding movies to keep track of what you want to watch!
+                </p>
+              </Card>
+            </motion.div>
+          )}
 
-        {/* Movies Grid */}
-        {!isLoading && !error && movies.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
-              {movies.map((movie: any, index: number) => (
-                <MovieCard
-                  key={movie.id}
-                  movie={movie}
-                  index={index}
-                  category={movie.category}
-                  enableWatchlistToggle={true}
-                />
-              ))}
-            </div>
-          </motion.div>
-        )}
+          {/* Movies Grid */}
+          {!isLoading && !error && movies.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+            >
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                {movies.map((movie: any, index: number) => (
+                  <MovieCard
+                    key={movie.id}
+                    movie={movie}
+                    index={index}
+                    category={movie.category}
+                    enableWatchlistToggle={true}
+                  />
+                ))}
+              </div>
+            </motion.div>
+          )}
         </div>
       </div>
       <Footer />
