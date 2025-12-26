@@ -58,18 +58,18 @@ interface Series {
 }
 
 export default function SeriesDetail({ params }: { params: Promise<{ id: string }> }) {
-    const resolvedParams = use(params);
-    const router = useRouter();
-    const [isTrailerOpen, setIsTrailerOpen] = useState(false);
-    const [isLoginOpen, setIsLoginOpen] = useState(false);
-    const [sortBy, setSortBy] = useState<'newest' | 'top'>('newest');
-    const [commentText, setCommentText] = useState('');
-    const [replyingTo, setReplyingTo] = useState<number | null>(null);
-    const [replyText, setReplyText] = useState('');
-    const [expandedComments, setExpandedComments] = useState<Set<number>>(new Set());
-    const [editingComment, setEditingComment] = useState<string | null>(null);
-    const [editText, setEditText] = useState('');
-    const { user, profileData, getIdToken } = useAuth();
+  const resolvedParams = use(params);
+  const router = useRouter();
+  const [isTrailerOpen, setIsTrailerOpen] = useState(false);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<'newest' | 'top'>('newest');
+  const [commentText, setCommentText] = useState('');
+  const [replyingTo, setReplyingTo] = useState<number | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [expandedComments, setExpandedComments] = useState<Set<number>>(new Set());
+  const [editingComment, setEditingComment] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const { user, profileData, getIdToken } = useAuth();
 
   const { data, error, isLoading } = useSWR(
     getApiUrl(`/api/content/series/${resolvedParams.id}`),
@@ -483,28 +483,7 @@ export default function SeriesDetail({ params }: { params: Promise<{ id: string 
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={async () => {
-                    if (user) {
-                      try {
-                        const idToken = await user.getIdToken();
-                        const response = await fetch(getApiUrl('/api/continue-watching'), {
-                          method: 'POST',
-                          headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${idToken}`,
-                          },
-                          body: JSON.stringify({ contentId: resolvedParams.id, contentType: 'tv' }),
-                        });
-
-                        if (!response.ok) {
-                          throw new Error('Failed to add to continue watching');
-                        }
-
-                        toast.success('Series added to continue watching');
-                      } catch (error) {
-                        toast.error('Failed to start watching. Please try again.');
-                      }
-                    }
+                  onClick={() => {
                     router.push(`/watch/${resolvedParams.id}?type=series`);
                   }}
                   className="w-full group relative px-6 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 overflow-hidden"
@@ -532,11 +511,10 @@ export default function SeriesDetail({ params }: { params: Promise<{ id: string 
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={toggleWatchlist}
-                    className={`px-4 py-3 rounded-xl backdrop-blur-sm border transition-all flex items-center justify-center gap-2 ${
-                      isInWatchlist
+                    className={`px-4 py-3 rounded-xl backdrop-blur-sm border transition-all flex items-center justify-center gap-2 ${isInWatchlist
                         ? 'bg-red-500/20 border-red-500/50 hover:border-red-400/70 text-red-100'
                         : 'bg-black/60 border-cyan-500/30 hover:border-cyan-400/60 text-cyan-100'
-                    }`}
+                      }`}
                   >
                     <Plus className={`w-5 h-5 ${isInWatchlist ? 'rotate-45' : ''} transition-transform duration-200`} />
                     <span>{isInWatchlist ? 'In List' : 'My List'}</span>
