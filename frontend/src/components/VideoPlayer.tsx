@@ -290,7 +290,7 @@ export function VideoPlayer({ src, poster, contentId, contentType, selectedSeaso
                   <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden cursor-pointer" onClick={handleProgressClick}>
                     <div
                       className="h-full bg-gradient-to-r from-cyan-500 to-violet-500 rounded-full transition-all"
-                      style={{ width: `${(currentTime / duration) * 100}%` }}
+                      style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
                     />
                   </div>
                 </div>
