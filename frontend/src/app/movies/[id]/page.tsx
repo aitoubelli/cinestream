@@ -4,6 +4,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Play, Plus, Share2, Star, Clock, Calendar, ThumbsUp, ArrowLeft } from "lucide-react";
 import { ImageWithFallback } from "@/components/ImageWithFallback";
@@ -56,18 +57,19 @@ interface Movie {
 }
 
 export default function MovieDetail({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const [isTrailerOpen, setIsTrailerOpen] = useState(false);
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [sortBy, setSortBy] = useState<'newest' | 'top'>('newest');
-  const [commentText, setCommentText] = useState('');
-  const [replyingTo, setReplyingTo] = useState<number | null>(null);
-  const [replyText, setReplyText] = useState('');
-  const [expandedComments, setExpandedComments] = useState<Set<number>>(new Set());
-  const [commentsPage, setCommentsPage] = useState(1);
-  const [editingComment, setEditingComment] = useState<string | null>(null);
-  const [editText, setEditText] = useState('');
-  const { user, profileData, getIdToken } = useAuth();
+   const resolvedParams = use(params);
+   const router = useRouter();
+   const [isTrailerOpen, setIsTrailerOpen] = useState(false);
+   const [isLoginOpen, setIsLoginOpen] = useState(false);
+   const [sortBy, setSortBy] = useState<'newest' | 'top'>('newest');
+   const [commentText, setCommentText] = useState('');
+   const [replyingTo, setReplyingTo] = useState<number | null>(null);
+   const [replyText, setReplyText] = useState('');
+   const [expandedComments, setExpandedComments] = useState<Set<number>>(new Set());
+   const [commentsPage, setCommentsPage] = useState(1);
+   const [editingComment, setEditingComment] = useState<string | null>(null);
+   const [editText, setEditText] = useState('');
+   const { user, profileData, getIdToken } = useAuth();
 
   const { data, error, isLoading } = useSWR(
     getApiUrl(`/api/content/movies/${resolvedParams.id}`),
@@ -520,6 +522,7 @@ export default function MovieDetail({ params }: { params: Promise<{ id: string }
                         toast.error('Failed to start watching. Please try again.');
                       }
                     }
+                    router.push(`/watch/${resolvedParams.id}?type=movie`);
                   }}
                   className="w-full group relative px-6 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 overflow-hidden"
                   style={{ boxShadow: '0 0 40px rgba(6, 182, 212, 0.5)' }}

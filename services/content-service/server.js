@@ -596,7 +596,7 @@ app.get('/tv/:id', async (req, res) => {
             return res.json(JSON.parse(cached));
         }
 
-        const data = await fetchFromTMDB(`/tv/${id}?append_to_response=credits,videos`);
+        const data = await fetchFromTMDB(`/tv/${id}?append_to_response=credits,videos,seasons`);
         await Content.findOneAndUpdate(
             { tmdbId: parseInt(id), mediaType: 'tv' },
             { data, updatedAt: new Date() },
@@ -609,6 +609,68 @@ app.get('/tv/:id', async (req, res) => {
     } catch (error) {
         if (error.response?.status === 404) {
             res.status(404).json({ error: 'TV show not found' });
+        } else {
+            res.status(500).json({ error: error.message });
+        }
+    }
+});
+
+/**
+ * @swagger
+ * /tv/{id}/season/{season_number}:
+ *   get:
+ *     summary: Get TV season details with episodes
+ *     tags: [Content]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: TV show ID
+ *       - in: path
+ *         name: season_number
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Season number
+ *     responses:
+ *       200:
+ *         description: Season details with episodes
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *       404:
+ *         description: Season not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+app.get('/tv/:id/season/:season_number', async (req, res) => {
+    try {
+        const { id, season_number } = req.params;
+        const cacheKey = `tmdb:tv:${id}:season:${season_number}`;
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+            res.set('X-Cache-Status', 'HIT');
+            return res.json(JSON.parse(cached));
+        }
+
+        const data = await fetchFromTMDB(`/tv/${id}/season/${season_number}`);
+        await redisClient.setEx(cacheKey, 3600, JSON.stringify(data));
+        res.set('X-Cache-Status', 'MISS');
+        res.json(data);
+    } catch (error) {
+        if (error.response?.status === 404) {
+            res.status(404).json({ error: 'Season not found' });
         } else {
             res.status(500).json({ error: error.message });
         }
@@ -795,7 +857,7 @@ app.get('/series/:id', async (req, res) => {
         return res.json(JSON.parse(cached));
     }
 
-    const data = await fetchFromTMDB(`/tv/${id}?append_to_response=credits,videos`);
+    const data = await fetchFromTMDB(`/tv/${id}?append_to_response=credits,videos,seasons`);
     await Content.findOneAndUpdate(
         { tmdbId: parseInt(id), mediaType: 'tv' },
         { data, updatedAt: new Date() },
