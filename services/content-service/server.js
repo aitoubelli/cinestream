@@ -815,6 +815,67 @@ app.get('/content/recommendations', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /content/similar:
+ *   get:
+ *     summary: Get similar content
+ *     tags: [Content]
+ *     parameters:
+ *       - in: query
+ *         name: contentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Content ID
+ *       - in: query
+ *         name: contentType
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [movie, tv]
+ *         description: Content type
+ *     responses:
+ *       200:
+ *         description: Similar content retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TrendingResponse'
+ *       400:
+ *         description: Bad request
+ *       500:
+ *         description: Internal server error
+ */
+app.get('/similar', async (req, res) => {
+    try {
+        const { contentId, contentType } = req.query;
+        if (!contentId || !contentType || !['movie', 'tv'].includes(contentType)) {
+            return res.status(400).json({ error: 'contentId and valid contentType (movie or tv) are required' });
+        }
+        const id = parseInt(contentId);
+        if (isNaN(id)) {
+            return res.status(400).json({ error: 'contentId must be a valid integer' });
+        }
+        const cacheKey = `tmdb:similar:${contentType}:${id}`;
+        const result = await getCachedOrFetch(cacheKey, () => fetchFromTMDB(`/${contentType}/${id}/similar`), 86400);
+        // Normalize results to ensure consistency
+        const normalizedResults = result.data.results.map(item => ({
+            ...item,
+            media_type: contentType,
+            title: item.title || item.name
+        }));
+        const normalizedData = {
+            ...result.data,
+            results: normalizedResults
+        };
+        res.set('X-Cache-Status', result.cached ? 'HIT' : 'MISS');
+        res.json(normalizedData);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Series routes (aliases for TV routes)
 app.get('/series/trending', async (req, res) => {
     const page = parseInt(req.query.page) || 1;

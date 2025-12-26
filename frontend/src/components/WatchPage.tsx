@@ -51,9 +51,9 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
     fetcher
   );
 
-  // Fetch recommendations
-  const { data: recommendationsData } = useSWR(
-    getApiUrl(`/api/content/recommendations?contentId=${contentId}&contentType=${contentType}`),
+  // Fetch similar content
+  const { data: similarData } = useSWR(
+    getApiUrl(`/api/content/similar?contentId=${contentId}&contentType=${contentType === 'movie' ? 'movie' : 'tv'}`),
     fetcher
   );
 
@@ -124,13 +124,14 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
     }
   };
 
-  const recommendedContent = recommendationsData?.data?.results?.slice(0, 6).map((item: any) => ({
+  const similarContent = similarData?.results?.slice(0, 8).map((item: any) => ({
     id: item.id,
     title: item.title || item.name,
     poster: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://via.placeholder.com/500x750?text=No+Image',
     rating: item.vote_average,
     year: item.release_date ? item.release_date.substring(0, 4) : item.first_air_date ? item.first_air_date.substring(0, 4) : 'N/A',
-    genres: item.genre_ids || []
+    genres: item.genre_ids || [],
+    contentType: item.media_type === 'movie' ? 'movie' : 'tv'
   })) || [];
 
   // Player Component
@@ -687,15 +688,19 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content Info */}
-            <div className={`${contentType === 'series' ? 'lg:col-span-3' : 'lg:col-span-2'}`}>
-              {/* Recommended */}
+            <div className="lg:col-span-3">
+              {/* Similar Content */}
               <div>
                 <h3 className="text-2xl text-cyan-100 mb-6">You May Also Like</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {recommendedContent.map((item: any, index: number) => (
-                    <MovieCard key={item.id} movie={item} index={index} />
-                  ))}
-                </div>
+                {similarContent.length > 0 ? (
+                  <div className={`grid gap-4 px-2 grid-cols-2 md:grid-cols-4 lg:grid-cols-4`}>
+                    {similarContent.map((item: any, index: number) => (
+                      <MovieCard key={item.id} movie={item} index={index} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-cyan-100/60">No similar content found</p>
+                )}
               </div>
           </div>
 
