@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, Pause, Volume2, VolumeX, Maximize, Settings, ChevronLeft, ChevronRight, SkipForward, SkipBack, Star, Plus, Share2, Eye, EyeOff, RotateCcw, RotateCw, Zap, Search, X } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Settings, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SkipForward, SkipBack, Star, Plus, Share2, Eye, EyeOff, RotateCcw, RotateCw, Zap, Search, X, CheckCircle2 } from 'lucide-react';
 import { MovieCard } from './MovieCard';
 import { VideoPlayer } from './VideoPlayer';
 import useSWR, { mutate } from 'swr';
@@ -84,6 +84,16 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
     { revalidateOnFocus: false } // Prevent overwrite while watching
   );
 
+  // Fetch progress for ALL episodes in the current season to highlight them in the list
+  const { data: seasonProgressData } = useSWR(
+    user && contentType === 'series' ? getApiUrl(`/api/user/watch-progress/season?contentId=${contentId}&seasonNumber=${selectedSeason}`) : null,
+    async (url: string) => {
+      const token = await getIdToken();
+      if (!token) return [];
+      return authenticatedFetcher(url, token);
+    }
+  );
+
   useEffect(() => {
     if (progressData) {
       // If we just resumed, we might get the same data
@@ -131,6 +141,12 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
     }
     saveProgress(time, duration);
   }, [saveProgress, videoTime]);
+
+  useEffect(() => {
+    // Reset video progress when episode/season changes
+    // This ensures the new episode starts at 0 while waiting for server-side progress to load
+    setVideoTime(0);
+  }, [selectedEpisode, selectedSeason]);
 
   useEffect(() => {
     console.log('[WatchPage] startPlaying state changed:', startPlaying, 'selectedEpisode:', selectedEpisode);
@@ -209,12 +225,14 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
 
   const handleNextEpisode = () => {
     if (selectedEpisode < episodes.length - 1) {
+      setVideoTime(0);
       setSelectedEpisode(selectedEpisode + 1);
     }
   };
 
   const handlePrevEpisode = () => {
     if (selectedEpisode > 0) {
+      setVideoTime(0);
       setSelectedEpisode(selectedEpisode - 1);
     }
   };
@@ -308,7 +326,7 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
                           disabled={selectedEpisode === 0}
                           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 hover:border-cyan-400/60 text-cyan-300 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                         >
-                          <RotateCcw className="w-4 h-4" />
+                          <ChevronsLeft className="w-5 h-5" />
                           <span>Previous</span>
                         </motion.button>
 
@@ -324,7 +342,7 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
                           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 hover:border-cyan-400/60 text-cyan-300 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                         >
                           <span>Next</span>
-                          <RotateCw className="w-4 h-4" />
+                          <ChevronsRight className="w-5 h-5" />
                         </motion.button>
                       </>
                     )}
@@ -367,7 +385,7 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
               {/* Right Sidebar */}
               {contentType === 'series' ? (
                 /* Episodes Sidebar for Series */
-                <div className="hidden lg:block relative min-w-0">
+                <div className="relative min-w-0 h-[500px] lg:h-auto">
                   <div
                     className="absolute inset-0 p-6 rounded-xl bg-black/40 backdrop-blur-sm border border-cyan-500/20 flex flex-col shadow-2xl"
                     style={{ boxShadow: '0 0 30px rgba(6, 182, 212, 0.15)' }}
@@ -406,13 +424,13 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
                     </select>
 
                     {/* Episode List */}
-                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 -mr-2 space-y-2">
+                    <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar pr-2 -mr-2 space-y-2">
                       {filteredEpisodes.map((episode: Episode) => {
                         const originalIndex = episodes.indexOf(episode);
                         return (
                           <motion.button
                             key={episode.id}
-                            whileHover={{ scale: 1.02 }}
+                            whileHover={{ x: 5 }}
                             onClick={() => setSelectedEpisode(originalIndex)}
                             className={`w-full text-left p-3 rounded-lg transition-all ${selectedEpisode === originalIndex
                               ? 'bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-400/60'
@@ -420,15 +438,44 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
                               }`}
                           >
                             <div className="flex gap-3">
-                              <img
-                                src={episode.still_path ? `https://image.tmdb.org/t/p/w300${episode.still_path}` : 'https://via.placeholder.com/300x169?text=No+Image'}
-                                alt={episode.name}
-                                className="w-16 h-10 object-cover rounded"
-                              />
+                              <div className="relative w-16 h-10 flex-shrink-0">
+                                <img
+                                  src={episode.still_path ? `https://image.tmdb.org/t/p/w300${episode.still_path}` : 'https://via.placeholder.com/300x169?text=No+Image'}
+                                  alt={episode.name}
+                                  className="w-full h-full object-cover rounded"
+                                />
+                                {(() => {
+                                  const epProgress = seasonProgressData?.find((p: any) => p.episodeNumber === episode.episode_number);
+                                  if (!epProgress) return null;
+                                  const percent = (epProgress.progressSeconds / epProgress.durationSeconds) * 100;
+                                  if (percent > 90) return (
+                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded">
+                                      <CheckCircle2 className="w-5 h-5 text-green-400 shadow-lg" />
+                                    </div>
+                                  );
+                                  return (
+                                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/60 rounded-b">
+                                      <div
+                                        className="h-full bg-cyan-500"
+                                        style={{ width: `${percent}%` }}
+                                      />
+                                    </div>
+                                  );
+                                })()}
+                              </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-cyan-100 text-sm mb-1 truncate">
-                                  {episode.episode_number}. {episode.name}
-                                </p>
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="text-cyan-100 text-sm mb-1 truncate">
+                                    {episode.episode_number}. {episode.name}
+                                  </p>
+                                  {(() => {
+                                    const epProgress = seasonProgressData?.find((p: any) => p.episodeNumber === episode.episode_number);
+                                    if (epProgress && (epProgress.progressSeconds / epProgress.durationSeconds) > 0.9) {
+                                      return <span className="text-[10px] text-green-400 font-bold uppercase tracking-wider">Done</span>;
+                                    }
+                                    return null;
+                                  })()}
+                                </div>
                                 <p className="text-cyan-100/60 text-xs">{episode.runtime ? `${episode.runtime} min` : 'N/A'}</p>
                               </div>
                             </div>
@@ -440,7 +487,7 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
                 </div>
               ) : (
                 /* Movie Sidebar */
-                <div className="hidden lg:block relative min-w-0">
+                <div className="relative min-w-0 h-[500px] lg:h-auto">
                   <div
                     className="absolute inset-0 p-6 rounded-xl bg-black/40 backdrop-blur-sm border border-cyan-500/20 flex flex-col shadow-2xl"
                     style={{ boxShadow: '0 0 30px rgba(6, 182, 212, 0.15)' }}
@@ -455,12 +502,12 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
                     </div>
 
                     {/* Cast Preview */}
-                    <div className="flex-1">
+                    <div className="flex-1 flex flex-col min-h-0">
                       <h3 className="text-xl text-cyan-100 mb-4 flex items-center gap-2">
                         <div className="w-1.5 h-6 bg-cyan-500 rounded-full" />
                         Cast Preview
                       </h3>
-                      <div className="space-y-3">
+                      <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 -mr-2 space-y-3">
                         {content.credits?.cast?.slice(0, 5).map((actor: any) => (
                           <div key={actor.id} className="flex items-center gap-4 p-3 rounded-lg bg-black/40 hover:bg-black/60 transition-colors">
                             <img
@@ -678,13 +725,13 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
                   </select>
 
                   {/* Episode List */}
-                  <div className="space-y-2 max-h-[600px] overflow-y-auto custom-scrollbar">
+                  <div className="space-y-2 max-h-[600px] overflow-y-auto overflow-x-hidden custom-scrollbar">
                     {filteredEpisodes.map((episode: Episode) => {
                       const originalIndex = episodes.indexOf(episode);
                       return (
                         <motion.button
                           key={episode.id}
-                          whileHover={{ scale: 1.02 }}
+                          whileHover={{ x: 5 }}
                           onClick={() => setSelectedEpisode(originalIndex)}
                           className={`w-full text-left p-3 rounded-lg transition-all ${selectedEpisode === originalIndex
                             ? 'bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-400/60'
@@ -692,15 +739,44 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
                             }`}
                         >
                           <div className="flex gap-3">
-                            <img
-                              src={episode.still_path ? `https://image.tmdb.org/t/p/w300${episode.still_path}` : 'https://via.placeholder.com/300x169?text=No+Image'}
-                              alt={episode.name}
-                              className="w-24 h-14 object-cover rounded"
-                            />
+                            <div className="relative w-24 h-14 flex-shrink-0">
+                              <img
+                                src={episode.still_path ? `https://image.tmdb.org/t/p/w300${episode.still_path}` : 'https://via.placeholder.com/300x169?text=No+Image'}
+                                alt={episode.name}
+                                className="w-full h-full object-cover rounded"
+                              />
+                              {(() => {
+                                const epProgress = seasonProgressData?.find((p: any) => p.episodeNumber === episode.episode_number);
+                                if (!epProgress) return null;
+                                const percent = (epProgress.progressSeconds / epProgress.durationSeconds) * 100;
+                                if (percent > 90) return (
+                                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded">
+                                    <CheckCircle2 className="w-6 h-6 text-green-400" />
+                                  </div>
+                                );
+                                return (
+                                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/60 rounded-b">
+                                    <div
+                                      className="h-full bg-cyan-500"
+                                      style={{ width: `${percent}%` }}
+                                    />
+                                  </div>
+                                );
+                              })()}
+                            </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-cyan-100 text-sm mb-1 truncate">
-                                {episode.episode_number}. {episode.name}
-                              </p>
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-cyan-100 text-sm mb-1 truncate">
+                                  {episode.episode_number}. {episode.name}
+                                </p>
+                                {(() => {
+                                  const epProgress = seasonProgressData?.find((p: any) => p.episodeNumber === episode.episode_number);
+                                  if (epProgress && (epProgress.progressSeconds / epProgress.durationSeconds) > 0.9) {
+                                    return <span className="text-[10px] text-green-400 font-bold uppercase tracking-wider">Done</span>;
+                                  }
+                                  return null;
+                                })()}
+                              </div>
                               <p className="text-cyan-100/60 text-xs">{episode.runtime ? `${episode.runtime} min` : 'N/A'}</p>
                             </div>
                           </div>

@@ -835,6 +835,29 @@ app.get('/history', verifyToken, async (req, res) => {
  *       200:
  *         description: Progress retrieved
  */
+app.get('/watch-progress/season', verifyToken, async (req, res) => {
+    try {
+        const { contentId, seasonNumber } = req.query;
+
+        if (!contentId || !seasonNumber) {
+            return res.status(400).json({ error: 'contentId and seasonNumber required' });
+        }
+
+        const filter = {
+            userId: req.user.id,
+            contentId: parseInt(contentId),
+            contentType: 'tv',
+            seasonNumber: parseInt(seasonNumber)
+        };
+
+        const history = await WatchHistory.find(filter);
+        res.json(history);
+    } catch (err) {
+        console.error('Error fetching season watch progress:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 app.get('/watch-progress', verifyToken, async (req, res) => {
     try {
         const { contentId, contentType, seasonNumber, episodeNumber } = req.query;
