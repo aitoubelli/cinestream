@@ -97,6 +97,14 @@ export function Navbar() {
     }
   };
 
+  const handleSearchSubmit = () => {
+    if (searchQuery.trim()) {
+      router.push(`/browse?search=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery('');
+      setIsSearchOpen(false);
+    }
+  };
+
   // Get user initials
   const getUserInitials = (user: any) => {
     if (user.displayName) {
@@ -423,6 +431,11 @@ export function Navbar() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSearchSubmit();
+                    }
+                  }}
                   placeholder="Search movies, TV shows..."
                   className="w-full px-6 py-3 bg-black/40 border border-cyan-500/30 rounded-xl text-cyan-100 placeholder:text-cyan-100/40 focus:outline-none focus:border-cyan-400/60 backdrop-blur-sm"
                   style={{ boxShadow: '0 0 20px rgba(6, 182, 212, 0.2)' }}
