@@ -3,30 +3,35 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Settings, ChevronLeft, ChevronRight, SkipForward, SkipBack, Star, Plus, Share2, Eye, EyeOff, RotateCcw, RotateCw, Zap, Search, X } from 'lucide-react';
 
 interface VideoPlayerProps {
-   src: string;
-   poster: string;
-   contentId: number;
-   contentType: 'movie' | 'series';
-   selectedSeason?: number;
-   selectedEpisode?: number;
-   initialTime?: number;
-   onTimeUpdate?: (time: number) => void;
-   onEnded?: () => void;
+    src: string;
+    poster: string;
+    contentId: number;
+    contentType: 'movie' | 'series';
+    selectedSeason?: number;
+    selectedEpisode?: number;
+    initialTime?: number;
+    onTimeUpdate?: (time: number) => void;
+    startPlaying?: boolean;
+    onEnded?: () => void;
+    onStartedPlaying?: () => void;
 }
 
-export function VideoPlayer({ src, poster, contentId, contentType, selectedSeason, selectedEpisode, initialTime, onTimeUpdate, onEnded }: VideoPlayerProps) {
+export function VideoPlayer({ src, poster, contentId, contentType, selectedSeason, selectedEpisode, initialTime, onTimeUpdate, startPlaying, onEnded, onStartedPlaying }: VideoPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
+  const [shouldPlayOnLoad, setShouldPlayOnLoad] = useState(false);
+  const shouldPlayRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const volumeKey = 'videoVolume';
 
   // Load volume on mount
   useEffect(() => {
+    console.log('[VideoPlayer] Mounted with startPlaying:', startPlaying, 'episode:', selectedEpisode);
     const savedVolume = localStorage.getItem(volumeKey);
     if (savedVolume) {
       const vol = parseFloat(savedVolume);
@@ -45,7 +50,7 @@ export function VideoPlayer({ src, poster, contentId, contentType, selectedSeaso
         videoRef.current.muted = false;
       }
     }
-  }, [volumeKey]);
+  }, [volumeKey, startPlaying, selectedEpisode]);
 
   // Video event listeners
   useEffect(() => {
@@ -57,11 +62,37 @@ export function VideoPlayer({ src, poster, contentId, contentType, selectedSeaso
       if (onTimeUpdate) onTimeUpdate(video.currentTime);
     };
 
+    const handleLoadStart = () => {
+      console.log('[VideoPlayer] loadstart event');
+    };
+
+    const handleLoadedData = () => {
+      console.log('[VideoPlayer] loadeddata event');
+    };
+
     const handleLoadedMetadata = () => {
+      console.log('[VideoPlayer] handleLoadedMetadata, startPlaying:', startPlaying, 'initialTime:', initialTime);
       setDuration(video.duration);
       if (initialTime !== undefined) {
         video.currentTime = initialTime;
         setCurrentTime(initialTime);
+      }
+      if (startPlaying) {
+        console.log('[VideoPlayer] Setting shouldPlayRef to true');
+        shouldPlayRef.current = true;
+      }
+    };
+
+    const handleCanPlay = () => {
+      console.log('[VideoPlayer] handleCanPlay, shouldPlayRef:', shouldPlayRef.current, 'readyState:', video.readyState);
+      if (shouldPlayRef.current) {
+        console.log('[VideoPlayer] Calling video.play()');
+        video.play().then(() => {
+          console.log('[VideoPlayer] video.play() succeeded');
+        }).catch(err => {
+          console.error('[VideoPlayer] video.play() failed:', err);
+        });
+        shouldPlayRef.current = false;
       }
     };
 
@@ -70,7 +101,9 @@ export function VideoPlayer({ src, poster, contentId, contentType, selectedSeaso
     };
 
     const handlePlay = () => {
+      console.log('[VideoPlayer] handlePlay event fired');
       setIsPlaying(true);
+      if (onStartedPlaying) onStartedPlaying();
     };
 
     const handleVolumeChange = () => {
@@ -79,25 +112,32 @@ export function VideoPlayer({ src, poster, contentId, contentType, selectedSeaso
     };
 
     const handleEnded = () => {
+      setIsPlaying(false);
       if (onEnded) onEnded();
     };
 
+    video.addEventListener('loadstart', handleLoadStart);
+    video.addEventListener('loadeddata', handleLoadedData);
     video.addEventListener('timeupdate', handleTimeUpdate);
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    video.addEventListener('canplay', handleCanPlay);
     video.addEventListener('pause', handlePause);
     video.addEventListener('play', handlePlay);
     video.addEventListener('volumechange', handleVolumeChange);
     video.addEventListener('ended', handleEnded);
 
     return () => {
+      video.removeEventListener('loadstart', handleLoadStart);
+      video.removeEventListener('loadeddata', handleLoadedData);
       video.removeEventListener('timeupdate', handleTimeUpdate);
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      video.removeEventListener('canplay', handleCanPlay);
       video.removeEventListener('pause', handlePause);
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('volumechange', handleVolumeChange);
       video.removeEventListener('ended', handleEnded);
     };
-  }, [initialTime, onTimeUpdate, onEnded]);
+  }, [initialTime, onTimeUpdate, startPlaying, onEnded, onStartedPlaying]);
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -189,15 +229,21 @@ export function VideoPlayer({ src, poster, contentId, contentType, selectedSeaso
               className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={togglePlay}
-                className="w-20 h-20 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 flex items-center justify-center"
-                style={{ boxShadow: '0 0 60px rgba(6, 182, 212, 0.8)' }}
-              >
-                <Play className="w-10 h-10 text-white ml-1" fill="white" />
-              </motion.button>
+              <div className="relative">
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={togglePlay}
+                  className="w-20 h-20 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 flex items-center justify-center relative z-10"
+                  style={{ boxShadow: '0 0 60px rgba(6, 182, 212, 0.8)' }}
+                >
+                  {startPlaying && !isPlaying ? (
+                    <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Play className="w-10 h-10 text-white ml-1" fill="white" />
+                  )}
+                </motion.button>
+              </div>
             </div>
           </div>
         )}

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Settings, ChevronLeft, ChevronRight, SkipForward, SkipBack, Star, Plus, Share2, Eye, EyeOff, RotateCcw, RotateCw, Zap, Search, X } from 'lucide-react';
 import { MovieCard } from './MovieCard';
@@ -31,6 +31,7 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
    const [focusMode, setFocusMode] = useState(false);
    const [autoPlay, setAutoPlay] = useState(false);
    const [episodeSearch, setEpisodeSearch] = useState('');
+   const [startPlaying, setStartPlaying] = useState(false);
    const [videoTime, setVideoTime] = useState(0);
 
    const progressKey = `watchProgress_${contentType}_${contentId}${selectedSeason !== undefined && selectedEpisode !== undefined ? `_${selectedSeason}_${selectedEpisode}` : ''}`;
@@ -46,10 +47,15 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
      }
    }, [progressKey]);
 
-   const handleTimeUpdate = (time: number) => {
+   const handleTimeUpdate = useCallback((time: number) => {
      setVideoTime(time);
      localStorage.setItem(progressKey, time.toString());
-   };
+   }, [progressKey]);
+
+   useEffect(() => {
+      console.log('[WatchPage] startPlaying state changed:', startPlaying, 'selectedEpisode:', selectedEpisode);
+    }, [startPlaying, selectedEpisode]);
+
 
    const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -92,6 +98,16 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
   const episodes: Episode[] = seasonData?.episodes || [];
   const currentSeason = seasons.find(s => s.season_number === selectedSeason);
   const currentEpisode = episodes[selectedEpisode];
+
+  const handleEnded = useCallback(() => {
+    console.log('[WatchPage] handleEnded called, autoPlay:', autoPlay, 'selectedEpisode:', selectedEpisode, 'episodes.length:', episodes.length);
+    if (contentType === 'series' && autoPlay && selectedEpisode < episodes.length - 1) {
+      console.log('[WatchPage] Auto-playing next episode');
+      setStartPlaying(true);
+      setSelectedEpisode(prev => prev + 1);
+    }
+  }, [contentType, autoPlay, selectedEpisode, episodes.length]);
+
 
   // Filter episodes based on search
   const filteredEpisodes = episodes.filter(episode =>
@@ -179,7 +195,7 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
 
                   {/* Video Container */}
                   <div className="relative">
-                    <VideoPlayer key={`${contentType}-${contentId}-${selectedSeason}-${selectedEpisode}`} src={videoUrl} poster={videoPoster} contentId={contentId} contentType={contentType} selectedSeason={selectedSeason} selectedEpisode={selectedEpisode} initialTime={videoTime} onTimeUpdate={handleTimeUpdate} onEnded={() => { if (contentType === 'series' && selectedEpisode < episodes.length - 1) setSelectedEpisode(selectedEpisode + 1); }} />
+                    <VideoPlayer key={`${contentType}-${contentId}-${selectedSeason}-${selectedEpisode}`} src={videoUrl} poster={videoPoster} contentId={contentId} contentType={contentType} selectedSeason={selectedSeason} selectedEpisode={selectedEpisode} initialTime={videoTime} onTimeUpdate={handleTimeUpdate} startPlaying={startPlaying} onEnded={handleEnded} onStartedPlaying={() => setStartPlaying(false)} />
                   </div>
                 </div>
               </motion.div>
@@ -195,7 +211,7 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
           <div className="grid lg:grid-cols-[2fr_1fr] gap-6">
             {/* Player Column */}
             <div className="flex flex-col gap-4 min-w-0">
-              <VideoPlayer key={`${contentType}-${contentId}-${selectedSeason}-${selectedEpisode}`} src={videoUrl} poster={videoPoster} contentId={contentId} contentType={contentType} selectedSeason={selectedSeason} selectedEpisode={selectedEpisode} initialTime={videoTime} onTimeUpdate={handleTimeUpdate} onEnded={() => { if (contentType === 'series' && selectedEpisode < episodes.length - 1) setSelectedEpisode(selectedEpisode + 1); }} />
+              <VideoPlayer key={`${contentType}-${contentId}-${selectedSeason}-${selectedEpisode}`} src={videoUrl} poster={videoPoster} contentId={contentId} contentType={contentType} selectedSeason={selectedSeason} selectedEpisode={selectedEpisode} initialTime={videoTime} onTimeUpdate={handleTimeUpdate} startPlaying={startPlaying} onEnded={handleEnded} onStartedPlaying={() => setStartPlaying(false)} />
 
   {/* Player Controls Bar */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-black/40 backdrop-blur-sm border border-cyan-500/20 rounded-xl p-4 gap-4 shadow-xl">
