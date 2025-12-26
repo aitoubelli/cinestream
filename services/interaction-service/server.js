@@ -442,6 +442,71 @@ app.get('/interactions/ratings/:contentId', optionalVerifyToken, async (req, res
 
 /**
  * @swagger
+ * /interactions/latest:
+ *   get:
+ *     summary: Get user's latest rated content
+ *     tags: [Interactions]
+ *     parameters:
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *       - in: query
+ *         name: type
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [rating]
+ *         description: Type of interaction
+ *     responses:
+ *       200:
+ *         description: Latest rated content retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 contentId:
+ *                   type: integer
+ *                 contentType:
+ *                   type: string
+ *                   enum: [movie, tv]
+ *       400:
+ *         description: Bad request
+ *       404:
+ *         description: No ratings found for user
+ */
+app.get('/interactions/latest', async (req, res) => {
+    try {
+        const { userId, type } = req.query;
+
+        if (!userId || type !== 'rating') {
+            return res.status(400).json({ error: 'userId and type=rating are required' });
+        }
+
+        // Get the latest rating for the user
+        const latestRating = await Rating.findOne({ userId })
+            .sort({ createdAt: -1 })
+            .lean();
+
+        if (!latestRating) {
+            return res.status(404).json({ error: 'No ratings found for user' });
+        }
+
+        res.json({
+            contentId: latestRating.contentId,
+            contentType: latestRating.contentType
+        });
+    } catch (err) {
+        console.error('Error fetching latest rating:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * @swagger
  * /interactions/comments/{commentId}:
  *   delete:
  *     summary: Delete a comment

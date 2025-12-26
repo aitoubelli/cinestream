@@ -399,6 +399,56 @@ app.delete('/watchlist/:contentId', verifyToken, async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /user/recommanded:
+ *   get:
+ *     summary: Get recommended content for user
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Recommendations retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 recommendations:
+ *                   type: array
+ *                   items:
+ *                     oneOf:
+ *                       - $ref: '#/components/schemas/TMDBMovie'
+ *                       - $ref: '#/components/schemas/TMDBTV'
+ *       500:
+ *         description: Internal server error
+ */
+app.get('/user/recommanded', verifyToken, async (req, res) => {
+    try {
+        const interactionServiceUrl = process.env.INTERACTION_SERVICE_URL || 'http://localhost:4004';
+        const contentServiceUrl = process.env.CONTENT_SERVICE_URL || 'http://localhost:4003';
+        try {
+            const latestResponse = await axios.get(`${interactionServiceUrl}/interactions/latest?userId=${req.user.id}&type=rating`);
+            const { contentId, contentType } = latestResponse.data;
+            const recResponse = await axios.get(`${contentServiceUrl}/content/recommendations?contentId=${contentId}&contentType=${contentType}`);
+            const recommendations = recResponse.data.data.results.slice(0, 12);
+            res.json({ recommendations });
+        } catch (latestError) {
+            if (latestError.response?.status === 404) {
+                const trendingResponse = await axios.get(`${contentServiceUrl}/trending/all/week`);
+                const recommendations = trendingResponse.data.results.slice(0, 12);
+                res.json({ recommendations });
+            } else {
+                throw latestError;
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching recommendations:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // Swagger setup
 const swaggerOptions = {
     definition: {

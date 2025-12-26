@@ -100,7 +100,7 @@ export default function Home() {
 
   // Fetch personalized recommendations (only if user is authenticated)
   const { data: recommendationsData, error: recommendationsError, isLoading: recommendationsLoading } = useSWR(
-    user ? getApiUrl("/api/recommendations/personalized") : null,
+    user ? getApiUrl("/api/user/recommanded") : null,
     (url: string) => authenticatedFetcher(url, user),
   );
 
@@ -163,7 +163,7 @@ export default function Home() {
   })) || [];
 
   // Transform personalized recommendations data
-  const recommendedMovies = recommendationsData?.data?.results?.slice(0, 12).map((movie: any) => ({
+  const recommendedMovies = recommendationsData?.recommendations?.slice(0, 12).map((movie: any) => ({
     id: movie.id,
     title: movie.title || movie.name || 'Unknown Title',
     poster: movie.poster_path

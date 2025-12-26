@@ -705,6 +705,54 @@ app.get('/tv/:id/recommendations', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /content/recommendations:
+ *   get:
+ *     summary: Get recommendations for content
+ *     tags: [Content]
+ *     parameters:
+ *       - in: query
+ *         name: contentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Content ID
+ *       - in: query
+ *         name: contentType
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [movie, tv]
+ *         description: Content type
+ *     responses:
+ *       200:
+ *         description: Recommendations retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TrendingResponse'
+ *       400:
+ *         description: Bad request
+ *       500:
+ *         description: Internal server error
+ */
+app.get('/content/recommendations', async (req, res) => {
+    try {
+        const { contentId, contentType } = req.query;
+        if (!contentId || !contentType || !['movie', 'tv'].includes(contentType)) {
+            return res.status(400).json({ error: 'contentId and valid contentType (movie or tv) are required' });
+        }
+        const id = parseInt(contentId);
+        const cacheKey = `tmdb:recommendations:${contentType}:${id}`;
+        const result = await getCachedOrFetch(cacheKey, () => fetchFromTMDB(`/${contentType}/${id}/recommendations`), 86400);
+        res.set('X-Cache-Status', result.cached ? 'HIT' : 'MISS');
+        res.json({ data: result.data });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Series routes (aliases for TV routes)
 app.get('/series/trending', async (req, res) => {
     const page = parseInt(req.query.page) || 1;

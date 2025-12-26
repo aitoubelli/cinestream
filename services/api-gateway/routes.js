@@ -24,6 +24,11 @@ module.exports = (app) => {
             res.status(500).json({ error: 'Proxy error' });
         }
     }));
+    app.use('/api/user/recommanded', createProxyMiddleware({
+        target: 'http://localhost:4002',
+        changeOrigin: true,
+        pathRewrite: { '^/api/user/recommanded': '/user/recommanded' },
+    }));
     app.use('/api/user', createProxyMiddleware({
         target: 'http://localhost:4002',
         changeOrigin: true,
