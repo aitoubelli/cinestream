@@ -24,9 +24,10 @@ interface MovieCardProps {
   category?: 'movies' | 'series' | 'anime';
   enableWatchlistToggle?: boolean;
   showProgress?: boolean;
+  linkToWatchPage?: boolean;
 }
 
-export function MovieCard({ movie, index, category = 'movies', enableWatchlistToggle = false, showProgress = false }: MovieCardProps) {
+export function MovieCard({ movie, index, category = 'movies', enableWatchlistToggle = false, showProgress = false, linkToWatchPage = false }: MovieCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const { user } = useAuth();
 
@@ -49,6 +50,9 @@ export function MovieCard({ movie, index, category = 'movies', enableWatchlistTo
   };
 
   const routePath = getRoutePath();
+  const finalLink = linkToWatchPage
+    ? `/watch/${movie.id}?type=${movie.contentType === 'movie' ? 'movie' : 'series'}`
+    : `/${routePath}/${movie.id}`;
 
   const { getIdToken } = useAuth();
 
@@ -131,7 +135,7 @@ export function MovieCard({ movie, index, category = 'movies', enableWatchlistTo
       onHoverEnd={() => setIsHovered(false)}
       className="relative group cursor-pointer"
     >
-      <Link href={`/${routePath}/${movie.id}`}>
+      <Link href={finalLink}>
         <div className="relative overflow-hidden rounded-xl aspect-[2/3]">
           {/* Poster Image */}
           <Image

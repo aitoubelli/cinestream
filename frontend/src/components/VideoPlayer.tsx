@@ -3,22 +3,22 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Settings, ChevronLeft, ChevronRight, SkipForward, SkipBack, Star, Plus, Share2, Eye, EyeOff, RotateCcw, RotateCw, Zap, Search, X } from 'lucide-react';
 
 interface VideoPlayerProps {
-    src: string;
-    poster: string;
-    contentId: number;
-    contentType: 'movie' | 'series';
-    selectedSeason?: number;
-    selectedEpisode?: number;
-    initialTime?: number;
-    onTimeUpdate?: (time: number) => void;
-    startPlaying?: boolean;
-    onEnded?: () => void;
-    onStartedPlaying?: () => void;
-    title?: string;
-    overview?: string;
-    rating?: number;
-    year?: number;
-    runtime?: number;
+  src: string;
+  poster: string;
+  contentId: number;
+  contentType: 'movie' | 'series';
+  selectedSeason?: number;
+  selectedEpisode?: number;
+  initialTime?: number;
+  onTimeUpdate?: (time: number, duration: number) => void;
+  startPlaying?: boolean;
+  onEnded?: () => void;
+  onStartedPlaying?: () => void;
+  title?: string;
+  overview?: string;
+  rating?: number;
+  year?: number;
+  runtime?: number;
 }
 
 export function VideoPlayer({ src, poster, contentId, contentType, selectedSeason, selectedEpisode, initialTime, onTimeUpdate, startPlaying, onEnded, onStartedPlaying, title, overview, rating, year, runtime }: VideoPlayerProps) {
@@ -66,7 +66,7 @@ export function VideoPlayer({ src, poster, contentId, contentType, selectedSeaso
 
     const handleTimeUpdate = () => {
       setCurrentTime(video.currentTime);
-      if (onTimeUpdate) onTimeUpdate(video.currentTime);
+      if (onTimeUpdate) onTimeUpdate(video.currentTime, video.duration);
     };
 
     const handleLoadStart = () => {

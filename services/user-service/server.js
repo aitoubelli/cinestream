@@ -599,6 +599,276 @@ app.get('/health', (req, res) => {
 // Connect to RabbitMQ on startup
 connectRabbit();
 
+// --- Watch History Schema & Endpoints ---
+
+const watchHistorySchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
+    contentId: { type: Number, required: true },
+    contentType: { type: String, enum: ['movie', 'tv'], required: true },
+    seasonNumber: { type: Number }, // Required for tv
+    episodeNumber: { type: Number }, // Required for tv
+    progressSeconds: { type: Number, required: true, default: 0 },
+    durationSeconds: { type: Number, required: true, default: 0 },
+    lastWatchedAt: { type: Date, default: Date.now },
+    completed: { type: Boolean, default: false }
+});
+
+// Compound index for efficient lookup
+watchHistorySchema.index({ userId: 1, contentId: 1, contentType: 1, seasonNumber: 1, episodeNumber: 1 }, { unique: true });
+// Index for sorting by last watched
+watchHistorySchema.index({ userId: 1, lastWatchedAt: -1 });
+
+const WatchHistory = mongoose.model('WatchHistory', watchHistorySchema);
+
+/**
+ * @swagger
+ * /continue-watching:
+ *   post:
+ *     summary: Update watch progress
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [contentId, contentType, progressSeconds, durationSeconds]
+ *             properties:
+ *               contentId: { type: number }
+ *               contentType: { type: string, enum: [movie, tv] }
+ *               seasonNumber: { type: number }
+ *               episodeNumber: { type: number }
+ *               progressSeconds: { type: number }
+ *               durationSeconds: { type: number }
+ *     responses:
+ *       200:
+ *         description: Progress updated
+ */
+app.post('/continue-watching', verifyToken, async (req, res) => {
+    try {
+        const { contentId, contentType, seasonNumber, episodeNumber, progressSeconds, durationSeconds } = req.body;
+
+        if (!contentId || !contentType || progressSeconds === undefined || durationSeconds === undefined) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        if (contentType === 'tv' && (seasonNumber === undefined || episodeNumber === undefined)) {
+            return res.status(400).json({ error: 'seasonNumber and episodeNumber required for TV series' });
+        }
+
+        const completed = durationSeconds > 0 && (progressSeconds / durationSeconds) >= 0.9;
+
+        const filter = {
+            userId: req.user.id,
+            contentId,
+            contentType,
+            ...(contentType === 'tv' && { seasonNumber, episodeNumber })
+        };
+
+        const update = {
+            progressSeconds,
+            durationSeconds,
+            lastWatchedAt: new Date(),
+            completed
+        };
+
+        await WatchHistory.findOneAndUpdate(filter, update, { upsert: true, new: true });
+
+        res.json({ success: true, completed });
+    } catch (err) {
+        console.error('Error updating watch history:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * @swagger
+ * /continue-watching:
+ *   get:
+ *     summary: Get continue watching list
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of items to continue watching
+ */
+app.get('/continue-watching', verifyToken, async (req, res) => {
+    try {
+        // Get all unfinished history items
+        // For movies: return simple item
+        // For series: return the most recently watched episode
+
+        // We can fetch all history for user, sorted by lastWatchedAt desc
+        const history = await WatchHistory.find({ userId: req.user.id }).sort({ lastWatchedAt: -1 }).limit(100);
+
+        // Group by contentId to avoid duplicates for series (show only latest episode)
+        const resultMap = new Map();
+
+        for (const item of history) {
+            const key = `${item.contentType}-${item.contentId}`;
+            if (!resultMap.has(key)) {
+                resultMap.set(key, item);
+            }
+        }
+
+        const results = Array.from(resultMap.values());
+
+        const enrichedResults = await Promise.all(results.map(async (item) => {
+            try {
+                // Call Content Service
+                const contentServiceUrl = process.env.CONTENT_SERVICE_URL || 'http://localhost:4003';
+                const endpoint = item.contentType === 'movie'
+                    ? `/movies/${item.contentId}`
+                    : `/tv/${item.contentId}`;
+
+                const response = await axios.get(`${contentServiceUrl}${endpoint}`);
+                const content = response.data;
+
+                // If it's a series, we might need episode name if we want to display "S1E3: Title"
+                let episodeName = '';
+                if (item.contentType === 'tv') {
+                    try {
+                        const epResponse = await axios.get(`${contentServiceUrl}/tv/${item.contentId}/season/${item.seasonNumber}/episode/${item.episodeNumber}`);
+                        episodeName = epResponse.data.name;
+                    } catch (e) { /* ignore */ }
+                }
+
+                return {
+                    id: item.contentId,
+                    title: content.title || content.name,
+                    name: content.name, // for series
+                    poster_path: content.poster_path,
+                    backdrop_path: content.backdrop_path,
+                    vote_average: content.vote_average,
+                    release_date: content.release_date,
+                    first_air_date: content.first_air_date,
+                    genre_ids: content.genres ? content.genres.map(g => g.id) : [],
+                    progress: item.durationSeconds > 0 ? (item.progressSeconds / item.durationSeconds) * 100 : 0,
+                    contentType: item.contentType,
+                    // Extra fields for Series display
+                    seasonNumber: item.seasonNumber,
+                    episodeNumber: item.episodeNumber,
+                    episodeName: episodeName
+                };
+            } catch (err) {
+                console.error(`Failed to enrich content ${item.contentId}:`, err.message);
+                return null;
+            }
+        }));
+
+        res.json({ results: enrichedResults.filter(r => r !== null) });
+    } catch (err) {
+        console.error('Error fetching continue watching:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * @swagger
+ * /history:
+ *   get:
+ *     summary: Get full watch history
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: filter
+ *         schema:
+ *           type: string
+ *           enum: [all, completed, in-progress]
+ *     responses:
+ *       200:
+ *         description: Watch history list
+ */
+app.get('/history', verifyToken, async (req, res) => {
+    try {
+        const { filter } = req.query; // 'all', 'completed', 'in-progress'
+
+        let query = { userId: req.user.id };
+
+        if (filter === 'completed') {
+            // For simplicity in granular list
+            query.completed = true;
+        } else if (filter === 'in-progress') {
+            query.completed = false;
+        }
+
+        const history = await WatchHistory.find(query).sort({ lastWatchedAt: -1 });
+
+        res.json({ data: history });
+    } catch (err) {
+        console.error('Error fetching history:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * @swagger
+ * /watch-progress:
+ *   get:
+ *     summary: Get watch progress for specific content
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: contentId
+ *         required: true
+ *         schema: { type: number }
+ *       - in: query
+ *         name: contentType
+ *         required: true
+ *         schema: { type: string, enum: [movie, tv] }
+ *       - in: query
+ *         name: seasonNumber
+ *         schema: { type: number }
+ *       - in: query
+ *         name: episodeNumber
+ *         schema: { type: number }
+ *     responses:
+ *       200:
+ *         description: Progress retrieved
+ */
+app.get('/watch-progress', verifyToken, async (req, res) => {
+    try {
+        const { contentId, contentType, seasonNumber, episodeNumber } = req.query;
+
+        if (!contentId || !contentType) {
+            return res.status(400).json({ error: 'contentId and contentType required' });
+        }
+
+        const filter = {
+            userId: req.user.id,
+            contentId: parseInt(contentId),
+            contentType,
+            ...(contentType === 'tv' && seasonNumber && episodeNumber && {
+                seasonNumber: parseInt(seasonNumber),
+                episodeNumber: parseInt(episodeNumber)
+            })
+        };
+
+        // Find sort by lastWatchedAt to get the latest interaction
+        const history = await WatchHistory.findOne(filter).sort({ lastWatchedAt: -1 });
+
+        if (history) {
+            res.json({
+                progressSeconds: history.progressSeconds,
+                seasonNumber: history.seasonNumber,
+                episodeNumber: history.episodeNumber
+            });
+        } else {
+            res.json({ progressSeconds: 0 });
+        }
+    } catch (err) {
+        console.error('Error fetching watch progress:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 app.listen(PORT, () => {
     startupLogger('User Service', PORT);
 });

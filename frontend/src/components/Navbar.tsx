@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Film, Menu, X, User, UserCircle, LayoutDashboard, LogOut, ChevronDown } from 'lucide-react';
+import { Search, Film, Menu, X, User, UserCircle, LayoutDashboard, LogOut, ChevronDown, History } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
@@ -360,6 +360,18 @@ export function Navbar() {
                         >
                           <LayoutDashboard className="w-5 h-5 text-violet-400" />
                           <span>Watchlist</span>
+                        </motion.button>
+
+                        <motion.button
+                          whileHover={{ x: 4 }}
+                          onClick={() => {
+                            router.push('/history');
+                            setIsProfileMenuOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-cyan-100 hover:bg-cyan-500/10 transition-all"
+                        >
+                          <History className="w-5 h-5 text-cyan-400" />
+                          <span>History</span>
                         </motion.button>
 
                         {userRole === 'admin' && (

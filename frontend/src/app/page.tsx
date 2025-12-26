@@ -55,6 +55,9 @@ interface ContentItem {
   genre_ids: number[];
   progress?: number; // For continue watching
   contentType?: string; // For continue watching
+  seasonNumber?: number;
+  episodeNumber?: number;
+  episodeName?: string;
 }
 
 export default function Home() {
@@ -75,13 +78,13 @@ export default function Home() {
 
   const { data: trendingData, error: trendingError, isLoading: trendingLoading } = useSWR(
     activeCategory === 'movies' ? getApiUrl("/api/content/movies/trending") :
-    getApiUrl("/api/content/series/trending"),
+      getApiUrl("/api/content/series/trending"),
     fetcher,
   );
 
   const { data: popularData, error: popularError, isLoading: popularLoading } = useSWR(
     activeCategory === 'movies' ? getApiUrl("/api/content/movies/popular") :
-    getApiUrl("/api/content/series/popular"),
+      getApiUrl("/api/content/series/popular"),
     fetcher,
   );
 
@@ -93,7 +96,7 @@ export default function Home() {
 
   // Fetch continue watching data (only if user is authenticated)
   const { data: continueWatchingData, error: continueWatchingError, isLoading: continueWatchingLoading } = useSWR(
-    user ? getApiUrl("/api/continue-watching") : null,
+    user ? getApiUrl("/api/user/continue-watching") : null,
     async (url: string) => {
       const token = await getIdToken();
       if (!token) throw new Error('No token available');
@@ -115,13 +118,13 @@ export default function Home() {
   // Fetch newest releases
   const { data: newestData, error: newestError, isLoading: newestLoading } = useSWR(
     activeCategory === 'movies' ? getApiUrl("/api/content/movies/now-playing") :
-    getApiUrl("/api/content/tv/on-the-air"),
+      getApiUrl("/api/content/tv/on-the-air"),
     fetcher,
   );
 
 
 
-// Transform content data to match component interface
+  // Transform content data to match component interface
   const transformContent = (item: ContentItem) => ({
     id: item.id,
     title: item.title || item.name || 'Unknown Title',
@@ -130,21 +133,23 @@ export default function Home() {
       : (item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : '/fallback-poster.svg'),
     rating: item.vote_average,
     year: item.release_date ? new Date(item.release_date).getFullYear().toString() :
-          item.first_air_date ? new Date(item.first_air_date).getFullYear().toString() : '2024',
+      item.first_air_date ? new Date(item.first_air_date).getFullYear().toString() : '2024',
     genres: ['Action', 'Sci-Fi'], // TODO: Map genre_ids to actual genre names
     contentType: activeCategory === 'movies' ? 'movie' : 'tv'
   });
 
   // Transform continue watching data
-  const continueWatchingMovies = continueWatchingData?.data?.results?.slice(0, 6).map((item: ContentItem) => ({
+  const continueWatchingMovies = continueWatchingData?.results?.slice(0, 6).map((item: ContentItem) => ({
     id: item.id,
-    title: item.title || item.name || 'Unknown Title',
+    title: item.contentType === 'tv' && item.seasonNumber
+      ? `${item.name || item.title} S${item.seasonNumber}E${item.episodeNumber}${item.episodeName ? `: ${item.episodeName}` : ''}`
+      : item.title || item.name || 'Unknown Title',
     poster: item.poster_path && item.poster_path.startsWith('http')
       ? item.poster_path
       : (item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : '/fallback-poster.svg'),
     rating: item.vote_average,
     year: item.release_date ? new Date(item.release_date).getFullYear().toString() :
-          item.first_air_date ? new Date(item.first_air_date).getFullYear().toString() : '2024',
+      item.first_air_date ? new Date(item.first_air_date).getFullYear().toString() : '2024',
     genres: ['Action', 'Sci-Fi'], // TODO: Map genre_ids to actual genre names
     progress: item.progress,
     contentType: item.contentType, // Preserve content type from backend
@@ -179,7 +184,7 @@ export default function Home() {
       : '/fallback-poster.svg',
     rating: movie.vote_average || 0,
     year: movie.release_date ? new Date(movie.release_date).getFullYear().toString() :
-          movie.first_air_date ? new Date(movie.first_air_date).getFullYear().toString() : '2024',
+      movie.first_air_date ? new Date(movie.first_air_date).getFullYear().toString() : '2024',
     genres: movie.genre_ids?.slice(0, 2).map((id: number) => {
       // Simple genre mapping - in production you'd want a proper genre lookup
       const genreMap: { [key: number]: string } = {
@@ -319,7 +324,7 @@ export default function Home() {
 
         {/* Continue Watching Section */}
         {user && continueWatchingMovies.length > 0 && (
-          <MovieGrid title="Continue Watching" movies={continueWatchingMovies} category="movies" enableWatchlistToggle={false} showProgress={true} />
+          <MovieGrid title="Continue Watching" movies={continueWatchingMovies} category="movies" enableWatchlistToggle={false} showProgress={true} linkToWatchPage={true} />
         )}
 
         {/* Recommended For You Section */}

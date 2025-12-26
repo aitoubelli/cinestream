@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Settings, ChevronLeft, ChevronRight, SkipForward, SkipBack, Star, Plus, Share2, Eye, EyeOff, RotateCcw, RotateCw, Zap, Search, X } from 'lucide-react';
 import { MovieCard } from './MovieCard';
 import { VideoPlayer } from './VideoPlayer';
-import useSWR from 'swr';
+import useSWR, { mutate } from 'swr';
 import { getApiUrl } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
 
 interface WatchPageProps {
   contentId: number;
@@ -25,39 +26,118 @@ interface Episode {
   episode_number: number;
 }
 
+const authenticatedFetcher = async (url: string, token: string) => {
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  if (!response.ok) throw new Error('Failed to fetch data');
+  return response.json();
+};
+
 export function WatchPage({ contentId, contentType }: WatchPageProps) {
-   const [selectedEpisode, setSelectedEpisode] = useState(0);
-   const [selectedSeason, setSelectedSeason] = useState(1);
-   const [focusMode, setFocusMode] = useState(false);
-   const [autoPlay, setAutoPlay] = useState(false);
-   const [episodeSearch, setEpisodeSearch] = useState('');
-   const [startPlaying, setStartPlaying] = useState(false);
-   const [videoTime, setVideoTime] = useState(0);
+  const [selectedEpisode, setSelectedEpisode] = useState(0);
+  const [selectedSeason, setSelectedSeason] = useState(1);
+  const [hasInitializedSeries, setHasInitializedSeries] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const [autoPlay, setAutoPlay] = useState(false);
+  const [episodeSearch, setEpisodeSearch] = useState('');
+  const [startPlaying, setStartPlaying] = useState(false);
+  const [videoTime, setVideoTime] = useState(0);
+  const { user, getIdToken } = useAuth();
 
-   const progressKey = `watchProgress_${contentType}_${contentId}${selectedSeason !== undefined && selectedEpisode !== undefined ? `_${selectedSeason}_${selectedEpisode}` : ''}`;
+  // Auto-resume for Series: fetching the absolute latest watched episode
+  const { data: resumeData } = useSWR(
+    user && contentType === 'series' && !hasInitializedSeries ? getApiUrl(`/api/user/watch-progress?contentId=${contentId}&contentType=tv`) : null,
+    async (url: string) => {
+      const token = await getIdToken();
+      if (!token) return null;
+      return authenticatedFetcher(url, token);
+    },
+    { revalidateOnFocus: false }
+  );
 
-   // Load saved progress on mount and when content changes
-   useEffect(() => {
-     const savedProgressStr = localStorage.getItem(progressKey);
-     if (savedProgressStr) {
-       const progress = parseFloat(savedProgressStr);
-       setVideoTime(progress);
-     } else {
-       setVideoTime(0);
-     }
-   }, [progressKey]);
+  useEffect(() => {
+    if (resumeData && contentType === 'series' && !hasInitializedSeries) {
+      if (resumeData.seasonNumber && resumeData.episodeNumber) {
+        console.log('Resuming Series at:', resumeData.seasonNumber, resumeData.episodeNumber);
+        setSelectedSeason(resumeData.seasonNumber);
+        // Episode number is 1-based, index is 0-based
+        setSelectedEpisode(resumeData.episodeNumber - 1);
+      }
+      setHasInitializedSeries(true);
+    } else if (contentType !== 'series') {
+      setHasInitializedSeries(true);
+    }
+  }, [resumeData, contentType, hasInitializedSeries]);
 
-   const handleTimeUpdate = useCallback((time: number) => {
-     setVideoTime(time);
-     localStorage.setItem(progressKey, time.toString());
-   }, [progressKey]);
+  // Fetch saved progress from backend for the CURRENT selected episode
+  // Only fetch if initialized (to avoid fetching S1E1 progress then immediately switching)
+  const { data: progressData } = useSWR(
+    user && hasInitializedSeries ? getApiUrl(`/api/user/watch-progress?contentId=${contentId}&contentType=${contentType === 'series' ? 'tv' : 'movie'}${contentType === 'series' ? `&seasonNumber=${selectedSeason}&episodeNumber=${selectedEpisode + 1}` : ''}`) : null,
+    async (url: string) => {
+      const token = await getIdToken();
+      if (!token) return { progressSeconds: 0 };
+      return authenticatedFetcher(url, token);
+    },
+    { revalidateOnFocus: false } // Prevent overwrite while watching
+  );
 
-   useEffect(() => {
-      console.log('[WatchPage] startPlaying state changed:', startPlaying, 'selectedEpisode:', selectedEpisode);
-    }, [startPlaying, selectedEpisode]);
+  useEffect(() => {
+    if (progressData) {
+      // If we just resumed, we might get the same data
+      console.log('Progress Loaded:', progressData.progressSeconds);
+      setVideoTime(progressData.progressSeconds || 0);
+    }
+  }, [progressData, contentId, contentType, selectedSeason, selectedEpisode]); // Added dependencies to reset on episode change logic
+
+  const lastSaveTimeRef = useRef(0);
+  const saveProgress = useCallback(async (time: number, duration: number) => {
+    if (!user) return;
+    const now = Date.now();
+    if (now - lastSaveTimeRef.current < 5000 && time < duration - 5) return; // Debounce 5s, unless near end
+
+    lastSaveTimeRef.current = now;
+    try {
+      const token = await getIdToken();
+      if (!token) return;
+
+      await fetch(getApiUrl('/api/user/continue-watching'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          contentId,
+          contentType: contentType === 'series' ? 'tv' : 'movie',
+          ...(contentType === 'series' && {
+            seasonNumber: selectedSeason,
+            episodeNumber: selectedEpisode + 1
+          }),
+          progressSeconds: time,
+          durationSeconds: duration
+        })
+      });
+    } catch (error) {
+      console.error('Failed to save progress', error);
+    }
+  }, [contentId, contentType, selectedSeason, selectedEpisode, user, getIdToken]);
+
+  const handleTimeUpdate = useCallback((time: number, duration: number) => {
+    if (Math.abs(time - videoTime) > 2) { // Only update state if diff > 2s to avoid stutter
+      setVideoTime(time);
+    }
+    saveProgress(time, duration);
+  }, [saveProgress, videoTime]);
+
+  useEffect(() => {
+    console.log('[WatchPage] startPlaying state changed:', startPlaying, 'selectedEpisode:', selectedEpisode);
+  }, [startPlaying, selectedEpisode]);
 
 
-   const fetcher = (url: string) => fetch(url).then((res) => res.json());
+  const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
   // Fetch content details
   const { data: contentData, error: contentError, isLoading: contentLoading } = useSWR(
@@ -209,202 +289,199 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
       {/* Video Player & Episodes Sidebar */}
       {!focusMode && (
         <div className="w-full bg-black">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
-          <div className="grid lg:grid-cols-[2fr_1fr] gap-6">
-            {/* Player Column */}
-            <div className="flex flex-col gap-4 min-w-0">
-              <VideoPlayer key={`${contentType}-${contentId}-${selectedSeason}-${selectedEpisode}`} src={videoUrl} poster={videoPoster} contentId={contentId} contentType={contentType} selectedSeason={selectedSeason} selectedEpisode={selectedEpisode} initialTime={videoTime} onTimeUpdate={handleTimeUpdate} startPlaying={startPlaying} onEnded={handleEnded} onStartedPlaying={() => setStartPlaying(false)} title={displayTitle} overview={overview} rating={rating} year={releaseYear} runtime={runtime} />
+          <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
+            <div className="grid lg:grid-cols-[2fr_1fr] gap-6">
+              {/* Player Column */}
+              <div className="flex flex-col gap-4 min-w-0">
+                <VideoPlayer key={`${contentType}-${contentId}-${selectedSeason}-${selectedEpisode}`} src={videoUrl} poster={videoPoster} contentId={contentId} contentType={contentType} selectedSeason={selectedSeason} selectedEpisode={selectedEpisode} initialTime={videoTime} onTimeUpdate={handleTimeUpdate} startPlaying={startPlaying} onEnded={handleEnded} onStartedPlaying={() => setStartPlaying(false)} title={displayTitle} overview={overview} rating={rating} year={releaseYear} runtime={runtime} />
 
-  {/* Player Controls Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-black/40 backdrop-blur-sm border border-cyan-500/20 rounded-xl p-4 gap-4 shadow-xl">
-                <div className="flex flex-wrap items-center gap-4">
-                  {/* Episode Navigation */}
-                  {contentType === 'series' && (
-                    <>
+                {/* Player Controls Bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-black/40 backdrop-blur-sm border border-cyan-500/20 rounded-xl p-4 gap-4 shadow-xl">
+                  <div className="flex flex-wrap items-center gap-4">
+                    {/* Episode Navigation */}
+                    {contentType === 'series' && (
+                      <>
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={handlePrevEpisode}
+                          disabled={selectedEpisode === 0}
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 hover:border-cyan-400/60 text-cyan-300 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                          <span>Previous</span>
+                        </motion.button>
+
+                        <div className="text-cyan-100 text-sm">
+                          Episode {selectedEpisode + 1} of {episodes.length}
+                        </div>
+
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={handleNextEpisode}
+                          disabled={selectedEpisode === episodes.length - 1}
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 hover:border-cyan-400/60 text-cyan-300 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                        >
+                          <span>Next</span>
+                          <RotateCw className="w-4 h-4" />
+                        </motion.button>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    {/* Auto Play Toggle */}
+                    {contentType === 'series' && (
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={handlePrevEpisode}
-                        disabled={selectedEpisode === 0}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 hover:border-cyan-400/60 text-cyan-300 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                        onClick={() => setAutoPlay(!autoPlay)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all ${autoPlay
+                          ? 'bg-violet-500/20 border-violet-500/50 text-violet-300'
+                          : 'bg-black/60 border-cyan-500/30 hover:border-cyan-400/60 text-cyan-100'
+                          }`}
                       >
-                        <RotateCcw className="w-4 h-4" />
-                        <span>Previous</span>
+                        <Zap className={`w-4 h-4 ${autoPlay ? 'text-violet-400' : ''}`} />
+                        <span>Auto Play</span>
                       </motion.button>
+                    )}
 
-                      <div className="text-cyan-100 text-sm">
-                        Episode {selectedEpisode + 1} of {episodes.length}
-                      </div>
-
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={handleNextEpisode}
-                        disabled={selectedEpisode === episodes.length - 1}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 hover:border-cyan-400/60 text-cyan-300 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                      >
-                        <span>Next</span>
-                        <RotateCw className="w-4 h-4" />
-                      </motion.button>
-                    </>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-4">
-                  {/* Auto Play Toggle */}
-                  {contentType === 'series' && (
+                    {/* Focus Mode Toggle */}
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      onClick={() => setAutoPlay(!autoPlay)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all ${
-                        autoPlay
-                          ? 'bg-violet-500/20 border-violet-500/50 text-violet-300'
-                          : 'bg-black/60 border-cyan-500/30 hover:border-cyan-400/60 text-cyan-100'
-                      }`}
-                    >
-                      <Zap className={`w-4 h-4 ${autoPlay ? 'text-violet-400' : ''}`} />
-                      <span>Auto Play</span>
-                    </motion.button>
-                  )}
-
-                  {/* Focus Mode Toggle */}
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setFocusMode(!focusMode)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all ${
-                      focusMode
+                      onClick={() => setFocusMode(!focusMode)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all ${focusMode
                         ? 'bg-violet-500/20 border-violet-500/50 text-violet-300'
                         : 'bg-black/60 border-cyan-500/30 hover:border-cyan-400/60 text-cyan-100'
-                    }`}
-                  >
-                    {focusMode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    <span>Focus Mode</span>
-                  </motion.button>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Sidebar */}
-            {contentType === 'series' ? (
-              /* Episodes Sidebar for Series */
-              <div className="hidden lg:block relative min-w-0">
-                <div
-                  className="absolute inset-0 p-6 rounded-xl bg-black/40 backdrop-blur-sm border border-cyan-500/20 flex flex-col shadow-2xl"
-                  style={{ boxShadow: '0 0 30px rgba(6, 182, 212, 0.15)' }}
-                >
-                  <h3 className="text-xl text-cyan-100 mb-4 flex items-center gap-2">
-                    <div className="w-1.5 h-6 bg-cyan-500 rounded-full" />
-                    Episodes
-                  </h3>
-
-                  {/* Episode Search */}
-                  <div className="relative mb-4">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-cyan-400" />
-                    <input
-                      type="text"
-                      placeholder="Search episodes..."
-                      value={episodeSearch}
-                      onChange={(e) => setEpisodeSearch(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 placeholder-cyan-100/50 focus:outline-none focus:border-cyan-400/60"
-                    />
-                  </div>
-
-                  {/* Season Selector */}
-                  <select
-                    value={selectedSeason}
-                    onChange={(e) => {
-                      setSelectedSeason(Number(e.target.value));
-                      setSelectedEpisode(0);
-                    }}
-                    className="w-full px-4 py-2 mb-4 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400/60 cursor-pointer"
-                  >
-                    {seasons.map((season: Season) => (
-                      <option key={season.season_number} value={season.season_number}>
-                        Season {season.season_number}
-                      </option>
-                    ))}
-                  </select>
-
-                  {/* Episode List */}
-                  <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 -mr-2 space-y-2">
-                    {filteredEpisodes.map((episode: Episode) => {
-                      const originalIndex = episodes.indexOf(episode);
-                      return (
-                        <motion.button
-                          key={episode.id}
-                          whileHover={{ scale: 1.02 }}
-                          onClick={() => setSelectedEpisode(originalIndex)}
-                          className={`w-full text-left p-3 rounded-lg transition-all ${
-                            selectedEpisode === originalIndex
-                              ? 'bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-400/60'
-                              : 'bg-black/40 border border-cyan-500/20 hover:border-cyan-400/40'
-                          }`}
-                        >
-                          <div className="flex gap-3">
-                            <img
-                              src={episode.still_path ? `https://image.tmdb.org/t/p/w300${episode.still_path}` : 'https://via.placeholder.com/300x169?text=No+Image'}
-                              alt={episode.name}
-                              className="w-16 h-10 object-cover rounded"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-cyan-100 text-sm mb-1 truncate">
-                                {episode.episode_number}. {episode.name}
-                              </p>
-                              <p className="text-cyan-100/60 text-xs">{episode.runtime ? `${episode.runtime} min` : 'N/A'}</p>
-                            </div>
-                          </div>
-                        </motion.button>
-                      );
-                    })}
+                        }`}
+                    >
+                      {focusMode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      <span>Focus Mode</span>
+                    </motion.button>
                   </div>
                 </div>
               </div>
-            ) : (
-              /* Movie Sidebar */
-              <div className="hidden lg:block relative min-w-0">
-                <div
-                  className="absolute inset-0 p-6 rounded-xl bg-black/40 backdrop-blur-sm border border-cyan-500/20 flex flex-col shadow-2xl"
-                  style={{ boxShadow: '0 0 30px rgba(6, 182, 212, 0.15)' }}
-                >
-                  {/* Movie Quote */}
-                  <div className="mb-6">
-                    <div className="text-center">
-                      <blockquote className="text-lg font-bold text-cyan-400 italic">
-                        "{content.tagline || 'Every story has a beginning...'}"
-                      </blockquote>
-                    </div>
-                  </div>
 
-                  {/* Cast Preview */}
-                  <div className="flex-1">
+              {/* Right Sidebar */}
+              {contentType === 'series' ? (
+                /* Episodes Sidebar for Series */
+                <div className="hidden lg:block relative min-w-0">
+                  <div
+                    className="absolute inset-0 p-6 rounded-xl bg-black/40 backdrop-blur-sm border border-cyan-500/20 flex flex-col shadow-2xl"
+                    style={{ boxShadow: '0 0 30px rgba(6, 182, 212, 0.15)' }}
+                  >
                     <h3 className="text-xl text-cyan-100 mb-4 flex items-center gap-2">
                       <div className="w-1.5 h-6 bg-cyan-500 rounded-full" />
-                      Cast Preview
+                      Episodes
                     </h3>
-                    <div className="space-y-3">
-                      {content.credits?.cast?.slice(0, 5).map((actor: any) => (
-                        <div key={actor.id} className="flex items-center gap-4 p-3 rounded-lg bg-black/40 hover:bg-black/60 transition-colors">
-                          <img
-                            src={actor.profile_path ? `https://image.tmdb.org/t/p/w92${actor.profile_path}` : 'https://via.placeholder.com/92x138?text=No+Image'}
-                            alt={actor.name}
-                            className="w-12 h-12 object-cover rounded-lg border border-cyan-500/20"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-cyan-100 text-base font-medium truncate">{actor.name}</p>
-                            <p className="text-cyan-100/70 text-sm truncate">{actor.character}</p>
-                          </div>
-                        </div>
-                      )) || <span className="text-cyan-100/60 text-sm">No cast information available</span>}
+
+                    {/* Episode Search */}
+                    <div className="relative mb-4">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-cyan-400" />
+                      <input
+                        type="text"
+                        placeholder="Search episodes..."
+                        value={episodeSearch}
+                        onChange={(e) => setEpisodeSearch(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 placeholder-cyan-100/50 focus:outline-none focus:border-cyan-400/60"
+                      />
+                    </div>
+
+                    {/* Season Selector */}
+                    <select
+                      value={selectedSeason}
+                      onChange={(e) => {
+                        setSelectedSeason(Number(e.target.value));
+                        setSelectedEpisode(0);
+                      }}
+                      className="w-full px-4 py-2 mb-4 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400/60 cursor-pointer"
+                    >
+                      {seasons.map((season: Season) => (
+                        <option key={season.season_number} value={season.season_number}>
+                          Season {season.season_number}
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* Episode List */}
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 -mr-2 space-y-2">
+                      {filteredEpisodes.map((episode: Episode) => {
+                        const originalIndex = episodes.indexOf(episode);
+                        return (
+                          <motion.button
+                            key={episode.id}
+                            whileHover={{ scale: 1.02 }}
+                            onClick={() => setSelectedEpisode(originalIndex)}
+                            className={`w-full text-left p-3 rounded-lg transition-all ${selectedEpisode === originalIndex
+                              ? 'bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-400/60'
+                              : 'bg-black/40 border border-cyan-500/20 hover:border-cyan-400/40'
+                              }`}
+                          >
+                            <div className="flex gap-3">
+                              <img
+                                src={episode.still_path ? `https://image.tmdb.org/t/p/w300${episode.still_path}` : 'https://via.placeholder.com/300x169?text=No+Image'}
+                                alt={episode.name}
+                                className="w-16 h-10 object-cover rounded"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-cyan-100 text-sm mb-1 truncate">
+                                  {episode.episode_number}. {episode.name}
+                                </p>
+                                <p className="text-cyan-100/60 text-xs">{episode.runtime ? `${episode.runtime} min` : 'N/A'}</p>
+                              </div>
+                            </div>
+                          </motion.button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+              ) : (
+                /* Movie Sidebar */
+                <div className="hidden lg:block relative min-w-0">
+                  <div
+                    className="absolute inset-0 p-6 rounded-xl bg-black/40 backdrop-blur-sm border border-cyan-500/20 flex flex-col shadow-2xl"
+                    style={{ boxShadow: '0 0 30px rgba(6, 182, 212, 0.15)' }}
+                  >
+                    {/* Movie Quote */}
+                    <div className="mb-6">
+                      <div className="text-center">
+                        <blockquote className="text-lg font-bold text-cyan-400 italic">
+                          "{content.tagline || 'Every story has a beginning...'}"
+                        </blockquote>
+                      </div>
+                    </div>
+
+                    {/* Cast Preview */}
+                    <div className="flex-1">
+                      <h3 className="text-xl text-cyan-100 mb-4 flex items-center gap-2">
+                        <div className="w-1.5 h-6 bg-cyan-500 rounded-full" />
+                        Cast Preview
+                      </h3>
+                      <div className="space-y-3">
+                        {content.credits?.cast?.slice(0, 5).map((actor: any) => (
+                          <div key={actor.id} className="flex items-center gap-4 p-3 rounded-lg bg-black/40 hover:bg-black/60 transition-colors">
+                            <img
+                              src={actor.profile_path ? `https://image.tmdb.org/t/p/w92${actor.profile_path}` : 'https://via.placeholder.com/92x138?text=No+Image'}
+                              alt={actor.name}
+                              className="w-12 h-12 object-cover rounded-lg border border-cyan-500/20"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-cyan-100 text-base font-medium truncate">{actor.name}</p>
+                              <p className="text-cyan-100/70 text-sm truncate">{actor.character}</p>
+                            </div>
+                          </div>
+                        )) || <span className="text-cyan-100/60 text-sm">No cast information available</span>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
       )}
 
       {/* Content Below Player */}
@@ -561,82 +638,81 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
                   <p className="text-cyan-100/60">No similar content found</p>
                 )}
               </div>
-          </div>
+            </div>
 
-          {/* Episodes Sidebar (for series/anime) - Hidden for series since it's now next to player */}
-          {contentType !== 'movie' && contentType !== 'series' && (
-            <div>
-              <div
-                className="p-6 rounded-xl bg-black/40 backdrop-blur-sm border border-cyan-500/20 sticky top-24"
-                style={{ boxShadow: '0 0 30px rgba(6, 182, 212, 0.15)' }}
-              >
-                <h3 className="text-xl text-cyan-100 mb-4">Episodes</h3>
-
-                {/* Episode Search */}
-                <div className="relative mb-4">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-cyan-400" />
-                  <input
-                    type="text"
-                    placeholder="Search episodes..."
-                    value={episodeSearch}
-                    onChange={(e) => setEpisodeSearch(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 placeholder-cyan-100/50 focus:outline-none focus:border-cyan-400/60"
-                  />
-                </div>
-
-                {/* Season Selector */}
-                <select
-                  value={selectedSeason}
-                  onChange={(e) => {
-                    setSelectedSeason(Number(e.target.value));
-                    setSelectedEpisode(0);
-                  }}
-                  className="w-full px-4 py-2 mb-4 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400/60 cursor-pointer"
+            {/* Episodes Sidebar (for series/anime) - Hidden for series since it's now next to player */}
+            {contentType !== 'movie' && contentType !== 'series' && (
+              <div>
+                <div
+                  className="p-6 rounded-xl bg-black/40 backdrop-blur-sm border border-cyan-500/20 sticky top-24"
+                  style={{ boxShadow: '0 0 30px rgba(6, 182, 212, 0.15)' }}
                 >
-                  {seasons.map((season: Season) => (
-                    <option key={season.season_number} value={season.season_number}>
-                      Season {season.season_number}
-                    </option>
-                  ))}
-                </select>
+                  <h3 className="text-xl text-cyan-100 mb-4">Episodes</h3>
 
-                {/* Episode List */}
-                <div className="space-y-2 max-h-[600px] overflow-y-auto custom-scrollbar">
-                  {filteredEpisodes.map((episode: Episode) => {
-                    const originalIndex = episodes.indexOf(episode);
-                    return (
-                      <motion.button
-                        key={episode.id}
-                        whileHover={{ scale: 1.02 }}
-                        onClick={() => setSelectedEpisode(originalIndex)}
-                        className={`w-full text-left p-3 rounded-lg transition-all ${
-                          selectedEpisode === originalIndex
+                  {/* Episode Search */}
+                  <div className="relative mb-4">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-cyan-400" />
+                    <input
+                      type="text"
+                      placeholder="Search episodes..."
+                      value={episodeSearch}
+                      onChange={(e) => setEpisodeSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 placeholder-cyan-100/50 focus:outline-none focus:border-cyan-400/60"
+                    />
+                  </div>
+
+                  {/* Season Selector */}
+                  <select
+                    value={selectedSeason}
+                    onChange={(e) => {
+                      setSelectedSeason(Number(e.target.value));
+                      setSelectedEpisode(0);
+                    }}
+                    className="w-full px-4 py-2 mb-4 rounded-lg bg-black/60 border border-cyan-500/30 text-cyan-100 focus:outline-none focus:border-cyan-400/60 cursor-pointer"
+                  >
+                    {seasons.map((season: Season) => (
+                      <option key={season.season_number} value={season.season_number}>
+                        Season {season.season_number}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Episode List */}
+                  <div className="space-y-2 max-h-[600px] overflow-y-auto custom-scrollbar">
+                    {filteredEpisodes.map((episode: Episode) => {
+                      const originalIndex = episodes.indexOf(episode);
+                      return (
+                        <motion.button
+                          key={episode.id}
+                          whileHover={{ scale: 1.02 }}
+                          onClick={() => setSelectedEpisode(originalIndex)}
+                          className={`w-full text-left p-3 rounded-lg transition-all ${selectedEpisode === originalIndex
                             ? 'bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-400/60'
                             : 'bg-black/40 border border-cyan-500/20 hover:border-cyan-400/40'
-                        }`}
-                      >
-                        <div className="flex gap-3">
-                          <img
-                            src={episode.still_path ? `https://image.tmdb.org/t/p/w300${episode.still_path}` : 'https://via.placeholder.com/300x169?text=No+Image'}
-                            alt={episode.name}
-                            className="w-24 h-14 object-cover rounded"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-cyan-100 text-sm mb-1 truncate">
-                              {episode.episode_number}. {episode.name}
-                            </p>
-                            <p className="text-cyan-100/60 text-xs">{episode.runtime ? `${episode.runtime} min` : 'N/A'}</p>
+                            }`}
+                        >
+                          <div className="flex gap-3">
+                            <img
+                              src={episode.still_path ? `https://image.tmdb.org/t/p/w300${episode.still_path}` : 'https://via.placeholder.com/300x169?text=No+Image'}
+                              alt={episode.name}
+                              className="w-24 h-14 object-cover rounded"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-cyan-100 text-sm mb-1 truncate">
+                                {episode.episode_number}. {episode.name}
+                              </p>
+                              <p className="text-cyan-100/60 text-xs">{episode.runtime ? `${episode.runtime} min` : 'N/A'}</p>
+                            </div>
                           </div>
-                        </div>
-                      </motion.button>
-                    );
-                  })}
+                        </motion.button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
       )}
     </div>
   );
