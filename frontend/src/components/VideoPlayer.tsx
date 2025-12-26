@@ -14,12 +14,19 @@ interface VideoPlayerProps {
     startPlaying?: boolean;
     onEnded?: () => void;
     onStartedPlaying?: () => void;
+    title?: string;
+    overview?: string;
+    rating?: number;
+    year?: number;
+    runtime?: number;
 }
 
-export function VideoPlayer({ src, poster, contentId, contentType, selectedSeason, selectedEpisode, initialTime, onTimeUpdate, startPlaying, onEnded, onStartedPlaying }: VideoPlayerProps) {
+export function VideoPlayer({ src, poster, contentId, contentType, selectedSeason, selectedEpisode, initialTime, onTimeUpdate, startPlaying, onEnded, onStartedPlaying, title, overview, rating, year, runtime }: VideoPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [showDetails, setShowDetails] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
@@ -76,6 +83,9 @@ export function VideoPlayer({ src, poster, contentId, contentType, selectedSeaso
       if (initialTime !== undefined) {
         video.currentTime = initialTime;
         setCurrentTime(initialTime);
+        if (initialTime > 0) {
+          setHasStarted(true);
+        }
       }
       if (startPlaying) {
         console.log('[VideoPlayer] Setting shouldPlayRef to true');
@@ -103,6 +113,7 @@ export function VideoPlayer({ src, poster, contentId, contentType, selectedSeaso
     const handlePlay = () => {
       console.log('[VideoPlayer] handlePlay event fired');
       setIsPlaying(true);
+      setHasStarted(true);
       if (onStartedPlaying) onStartedPlaying();
     };
 
@@ -209,8 +220,8 @@ export function VideoPlayer({ src, poster, contentId, contentType, selectedSeaso
       <div
         className="relative w-full aspect-video max-h-[60vh] sm:max-h-[70vh] md:max-h-none bg-black group rounded-xl overflow-hidden shadow-2xl border border-white/5"
         style={{ boxShadow: '0 0 40px rgba(6, 182, 212, 0.3), 0 0 80px rgba(139, 92, 246, 0.2)' }}
-        onMouseEnter={() => setShowControls(true)}
-        onMouseLeave={() => setShowControls(false)}
+        onMouseEnter={() => { setShowControls(true); setShowDetails(true); }}
+        onMouseLeave={() => { setShowControls(false); setShowDetails(false); }}
       >
         {/* Video Element */}
         <video
@@ -220,8 +231,22 @@ export function VideoPlayer({ src, poster, contentId, contentType, selectedSeaso
           onClick={togglePlay}
         />
 
+        {/* Details Overlay */}
+        <AnimatePresence>
+          {showDetails && title && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute top-4 left-4 text-white text-lg font-semibold px-3 py-1 rounded z-20"
+            >
+              {title}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Play Overlay */}
-        {!isPlaying && (
+        {!isPlaying && !hasStarted && (
           <div className="absolute inset-0">
             <img
               src={poster}

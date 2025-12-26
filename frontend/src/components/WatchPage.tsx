@@ -99,6 +99,8 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
   const currentSeason = seasons.find(s => s.season_number === selectedSeason);
   const currentEpisode = episodes[selectedEpisode];
 
+  const displayTitle = contentType === 'series' ? `S${selectedSeason.toString().padStart(2, '0')}E${(selectedEpisode + 1).toString().padStart(2, '0')} : ${currentEpisode?.name || ''}` : title;
+
   const handleEnded = useCallback(() => {
     console.log('[WatchPage] handleEnded called, autoPlay:', autoPlay, 'selectedEpisode:', selectedEpisode, 'episodes.length:', episodes.length);
     if (contentType === 'series' && autoPlay && selectedEpisode < episodes.length - 1) {
@@ -195,7 +197,7 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
 
                   {/* Video Container */}
                   <div className="relative">
-                    <VideoPlayer key={`${contentType}-${contentId}-${selectedSeason}-${selectedEpisode}`} src={videoUrl} poster={videoPoster} contentId={contentId} contentType={contentType} selectedSeason={selectedSeason} selectedEpisode={selectedEpisode} initialTime={videoTime} onTimeUpdate={handleTimeUpdate} startPlaying={startPlaying} onEnded={handleEnded} onStartedPlaying={() => setStartPlaying(false)} />
+                    <VideoPlayer key={`${contentType}-${contentId}-${selectedSeason}-${selectedEpisode}`} src={videoUrl} poster={videoPoster} contentId={contentId} contentType={contentType} selectedSeason={selectedSeason} selectedEpisode={selectedEpisode} initialTime={videoTime} onTimeUpdate={handleTimeUpdate} startPlaying={startPlaying} onEnded={handleEnded} onStartedPlaying={() => setStartPlaying(false)} title={displayTitle} overview={overview} rating={rating} year={releaseYear} runtime={runtime} />
                   </div>
                 </div>
               </motion.div>
@@ -211,7 +213,7 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
           <div className="grid lg:grid-cols-[2fr_1fr] gap-6">
             {/* Player Column */}
             <div className="flex flex-col gap-4 min-w-0">
-              <VideoPlayer key={`${contentType}-${contentId}-${selectedSeason}-${selectedEpisode}`} src={videoUrl} poster={videoPoster} contentId={contentId} contentType={contentType} selectedSeason={selectedSeason} selectedEpisode={selectedEpisode} initialTime={videoTime} onTimeUpdate={handleTimeUpdate} startPlaying={startPlaying} onEnded={handleEnded} onStartedPlaying={() => setStartPlaying(false)} />
+              <VideoPlayer key={`${contentType}-${contentId}-${selectedSeason}-${selectedEpisode}`} src={videoUrl} poster={videoPoster} contentId={contentId} contentType={contentType} selectedSeason={selectedSeason} selectedEpisode={selectedEpisode} initialTime={videoTime} onTimeUpdate={handleTimeUpdate} startPlaying={startPlaying} onEnded={handleEnded} onStartedPlaying={() => setStartPlaying(false)} title={displayTitle} overview={overview} rating={rating} year={releaseYear} runtime={runtime} />
 
   {/* Player Controls Bar */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-black/40 backdrop-blur-sm border border-cyan-500/20 rounded-xl p-4 gap-4 shadow-xl">
