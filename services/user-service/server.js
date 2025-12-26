@@ -407,6 +407,13 @@ app.delete('/watchlist/:contentId', verifyToken, async (req, res) => {
  *     tags: [User]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: contentType
+ *         schema:
+ *           type: string
+ *           enum: [movie, tv, all]
+ *         description: Filter recommendations by content type (optional)
  *     responses:
  *       200:
  *         description: Recommendations retrieved successfully
@@ -426,17 +433,49 @@ app.delete('/watchlist/:contentId', verifyToken, async (req, res) => {
  */
 app.get('/user/recommanded', verifyToken, async (req, res) => {
     try {
+        const { contentType } = req.query; // 'movie', 'tv', or undefined
         const interactionServiceUrl = process.env.INTERACTION_SERVICE_URL || 'http://localhost:4004';
         const contentServiceUrl = process.env.CONTENT_SERVICE_URL || 'http://localhost:4003';
+
         try {
+            // Try to get personalized recommendations based on user's latest interaction
             const latestResponse = await axios.get(`${interactionServiceUrl}/interactions/latest?userId=${req.user.id}&type=rating`);
-            const { contentId, contentType } = latestResponse.data;
-            const recResponse = await axios.get(`${contentServiceUrl}/content/recommendations?contentId=${contentId}&contentType=${contentType}`);
-            const recommendations = recResponse.data.data.results.slice(0, 12);
-            res.json({ recommendations });
+            const { contentId, contentType: interactionContentType } = latestResponse.data;
+
+            // If contentType is specified and matches the interaction type, use personalized recs
+            // If contentType is specified but doesn't match, we'll fall back to trending of that type
+            // If no contentType specified, use the interaction type
+            const targetContentType = contentType && contentType !== 'all' ? contentType :
+                interactionContentType;
+
+            try {
+                const recResponse = await axios.get(`${contentServiceUrl}/content/recommendations?contentId=${contentId}&contentType=${targetContentType}`);
+                const recommendations = recResponse.data.data.results.slice(0, 12);
+                res.json({ recommendations });
+            } catch (recError) {
+                // If recommendations not available, fall back to trending of target type
+                let trendingResponse;
+                if (targetContentType === 'tv') {
+                    trendingResponse = await axios.get(`${contentServiceUrl}/tv/trending`);
+                } else if (targetContentType === 'movie') {
+                    trendingResponse = await axios.get(`${contentServiceUrl}/movies/trending`);
+                } else {
+                    trendingResponse = await axios.get(`${contentServiceUrl}/trending/all/week`);
+                }
+                const recommendations = trendingResponse.data.results.slice(0, 12);
+                res.json({ recommendations });
+            }
         } catch (latestError) {
             if (latestError.response?.status === 404) {
-                const trendingResponse = await axios.get(`${contentServiceUrl}/trending/all/week`);
+                // No user interactions found, return trending content of requested type
+                let trendingResponse;
+                if (contentType === 'tv') {
+                    trendingResponse = await axios.get(`${contentServiceUrl}/tv/trending`);
+                } else if (contentType === 'movie') {
+                    trendingResponse = await axios.get(`${contentServiceUrl}/movies/trending`);
+                } else {
+                    trendingResponse = await axios.get(`${contentServiceUrl}/trending/all/week`);
+                }
                 const recommendations = trendingResponse.data.results.slice(0, 12);
                 res.json({ recommendations });
             } else {

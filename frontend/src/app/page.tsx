@@ -103,7 +103,7 @@ export default function Home() {
 
   // Fetch personalized recommendations (only if user is authenticated)
   const { data: recommendationsData, error: recommendationsError, isLoading: recommendationsLoading } = useSWR(
-    user ? getApiUrl("/api/user/recommanded") : null,
+    user ? `${getApiUrl("/api/user/recommanded")}?contentType=${activeCategory === 'movies' ? 'movie' : 'tv'}` : null,
     async (url: string) => {
       const token = await getIdToken();
       if (!token) throw new Error('No token available');
@@ -111,10 +111,6 @@ export default function Home() {
     },
   );
 
-  console.log('Debug: User authenticated:', !!user);
-  console.log('Debug: Recommendations data:', recommendationsData);
-  console.log('Debug: Recommendations error:', recommendationsError);
-  console.log('Debug: Recommendations loading:', recommendationsLoading);
 
   // Fetch newest releases
   const { data: newestData, error: newestError, isLoading: newestLoading } = useSWR(
@@ -197,8 +193,6 @@ export default function Home() {
     contentType: movie.contentType, // Preserve content type from backend
   })) || [];
 
-  console.log('Debug: Transformed recommendedMovies:', recommendedMovies);
-  console.log('Debug: recommendedMovies length:', recommendedMovies.length);
 
   if (trendingLoading || popularLoading || featuredMoviesLoading) {
     return (
@@ -329,13 +323,9 @@ export default function Home() {
         )}
 
         {/* Recommended For You Section */}
-        {(() => {
-          console.log('Debug: Checking render conditions - user:', !!user, 'recommendedMovies.length:', recommendedMovies.length);
-          console.log('Debug: Should render Recommended section:', user && recommendedMovies.length > 0);
-          return user && recommendedMovies.length > 0 && (
-            <MovieGrid title="Recommended For You" movies={recommendedMovies} category="movies" enableWatchlistToggle={false} />
-          );
-        })()}
+        {user && recommendedMovies.length > 0 && (
+          <MovieGrid title="Recommended For You" movies={recommendedMovies} category={activeCategory} enableWatchlistToggle={false} />
+        )}
 
         {/* Newest Releases Section */}
         {newestMovies.length > 0 && (
