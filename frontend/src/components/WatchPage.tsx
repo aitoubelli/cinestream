@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Settings, ChevronLeft, ChevronRight, SkipForward, SkipBack, Star, Plus, Share2, Eye, EyeOff, RotateCcw, RotateCw, Zap, Search, X } from 'lucide-react';
 import { MovieCard } from './MovieCard';
+import { VideoPlayer } from './VideoPlayer';
 import useSWR from 'swr';
 import { getApiUrl } from '@/lib/utils';
 
@@ -25,19 +26,32 @@ interface Episode {
 }
 
 export function WatchPage({ contentId, contentType }: WatchPageProps) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [showControls, setShowControls] = useState(true);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration] = useState(120); // 2 minutes for demo
-  const [selectedEpisode, setSelectedEpisode] = useState(0);
-  const [selectedSeason, setSelectedSeason] = useState(1);
-  const [focusMode, setFocusMode] = useState(false);
-  const [autoPlay, setAutoPlay] = useState(false);
-  const [episodeSearch, setEpisodeSearch] = useState('');
-  const videoRef = useRef<HTMLVideoElement>(null);
+   const [selectedEpisode, setSelectedEpisode] = useState(0);
+   const [selectedSeason, setSelectedSeason] = useState(1);
+   const [focusMode, setFocusMode] = useState(false);
+   const [autoPlay, setAutoPlay] = useState(false);
+   const [episodeSearch, setEpisodeSearch] = useState('');
+   const [videoTime, setVideoTime] = useState(0);
 
-  const fetcher = (url: string) => fetch(url).then((res) => res.json());
+   const progressKey = `watchProgress_${contentType}_${contentId}${selectedSeason !== undefined && selectedEpisode !== undefined ? `_${selectedSeason}_${selectedEpisode}` : ''}`;
+
+   // Load saved progress on mount and when content changes
+   useEffect(() => {
+     const savedProgressStr = localStorage.getItem(progressKey);
+     if (savedProgressStr) {
+       const progress = parseFloat(savedProgressStr);
+       setVideoTime(progress);
+     } else {
+       setVideoTime(0);
+     }
+   }, [progressKey]);
+
+   const handleTimeUpdate = (time: number) => {
+     setVideoTime(time);
+     localStorage.setItem(progressKey, time.toString());
+   };
+
+   const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
   // Fetch content details
   const { data: contentData, error: contentError, isLoading: contentLoading } = useSWR(
@@ -88,29 +102,12 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
   // Bunny video URL
   const videoUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
 
-  // Auto-play next episode when current ends
-  useEffect(() => {
-    const video = videoRef.current;
-    if (video && autoPlay && contentType === 'series') {
-      const handleEnded = () => {
-        if (selectedEpisode < episodes.length - 1) {
-          setSelectedEpisode(selectedEpisode + 1);
-        }
-      };
-      video.addEventListener('ended', handleEnded);
-      return () => video.removeEventListener('ended', handleEnded);
-    }
-  }, [autoPlay, contentType, selectedEpisode, episodes.length]);
+  // Determine poster for video player
+  const videoPoster = contentType === 'series' && currentEpisode?.still_path
+    ? `https://image.tmdb.org/t/p/w1280${currentEpisode.still_path}`
+    : poster;
 
-  const togglePlay = () => {
-    setIsPlaying(!isPlaying);
-  };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
   const handleNextEpisode = () => {
     if (selectedEpisode < episodes.length - 1) {
@@ -133,162 +130,6 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
     genres: item.genre_ids || [],
     contentType: item.media_type === 'movie' ? 'movie' : 'tv'
   })) || [];
-
-  // Player Component
-  const PlayerComponent = () => (
-    <div className="relative group/glow">
-      {/* Glow Effect */}
-      <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/30 to-violet-600/30 rounded-2xl blur-2xl opacity-60 group-hover/glow:opacity-100 transition duration-1000" />
-      <div className="absolute -inset-8 bg-gradient-to-r from-cyan-500/20 to-violet-600/20 rounded-3xl blur-3xl opacity-40 group-hover/glow:opacity-100 transition duration-1000" />
-
-      <div
-        className="relative w-full aspect-video max-h-[60vh] sm:max-h-[70vh] md:max-h-none bg-black group rounded-xl overflow-hidden shadow-2xl border border-white/5"
-        style={{ boxShadow: '0 0 40px rgba(6, 182, 212, 0.3), 0 0 80px rgba(139, 92, 246, 0.2)' }}
-        onMouseEnter={() => setShowControls(true)}
-        onMouseLeave={() => setShowControls(false)}
-      >
-        {/* Video Element */}
-        <video
-          ref={videoRef}
-          className="w-full h-full"
-          src={videoUrl}
-          poster={backdrop || poster}
-        />
-
-        {/* Play Overlay */}
-        {!isPlaying && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={togglePlay}
-              className="w-20 h-20 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 flex items-center justify-center"
-              style={{ boxShadow: '0 0 60px rgba(6, 182, 212, 0.8)' }}
-            >
-              <Play className="w-10 h-10 text-white ml-1" fill="white" />
-            </motion.button>
-          </div>
-        )}
-
-        {/* Controls Overlay */}
-        <AnimatePresence>
-          {showControls && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent"
-            >
-              {/* Top Info Bar */}
-              <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/80 to-transparent">
-                <h1 className="text-2xl text-white mb-1">
-                  {contentType === 'movie' ? title : `${title} - S${selectedSeason}E${selectedEpisode + 1}`}
-                </h1>
-                {contentType !== 'movie' && currentEpisode && (
-                  <p className="text-cyan-100/80">{currentEpisode.name}</p>
-                )}
-              </div>
-
-              {/* Bottom Controls */}
-              <div className="absolute bottom-0 left-0 right-0 p-6">
-                {/* Progress Bar */}
-                <div className="mb-4">
-                  <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden cursor-pointer">
-                    <div
-                      className="h-full bg-gradient-to-r from-cyan-500 to-violet-500 rounded-full transition-all"
-                      style={{ width: `${(currentTime / duration) * 100}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Control Buttons */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    {/* Play/Pause */}
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={togglePlay}
-                      className="text-white"
-                    >
-                      {isPlaying ? (
-                        <Pause className="w-8 h-8" fill="white" />
-                      ) : (
-                        <Play className="w-8 h-8" fill="white" />
-                      )}
-                    </motion.button>
-
-                    {/* Previous/Next Episode (for series/anime) */}
-                    {contentType !== 'movie' && (
-                      <>
-                        <motion.button
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                          onClick={handlePrevEpisode}
-                          disabled={selectedEpisode === 0}
-                          className="text-white disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          <SkipBack className="w-6 h-6" fill="white" />
-                        </motion.button>
-                        <motion.button
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                          onClick={handleNextEpisode}
-                          disabled={selectedEpisode === episodes.length - 1}
-                          className="text-white disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          <SkipForward className="w-6 h-6" fill="white" />
-                        </motion.button>
-                      </>
-                    )}
-
-                    {/* Volume */}
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => setIsMuted(!isMuted)}
-                      className="text-white"
-                    >
-                      {isMuted ? (
-                        <VolumeX className="w-6 h-6" />
-                      ) : (
-                        <Volume2 className="w-6 h-6" />
-                      )}
-                    </motion.button>
-
-                    {/* Time */}
-                    <span className="text-white text-sm">
-                      {formatTime(currentTime)} / {formatTime(duration)}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap items-center justify-center sm:justify-end gap-4">
-                    {/* Settings */}
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      className="text-white"
-                    >
-                      <Settings className="w-6 h-6" />
-                    </motion.button>
-
-                    {/* Fullscreen */}
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      className="text-white"
-                    >
-                      <Maximize className="w-6 h-6" />
-                    </motion.button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </div>
-  );
 
   return (
     <div className={`min-h-screen pb-16 ${focusMode ? 'bg-black' : ''}`} style={{ paddingTop: focusMode ? '0' : '120px' }}>
@@ -338,7 +179,7 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
 
                   {/* Video Container */}
                   <div className="relative">
-                    <PlayerComponent />
+                    <VideoPlayer key={`${contentType}-${contentId}-${selectedSeason}-${selectedEpisode}`} src={videoUrl} poster={videoPoster} contentId={contentId} contentType={contentType} selectedSeason={selectedSeason} selectedEpisode={selectedEpisode} initialTime={videoTime} onTimeUpdate={handleTimeUpdate} onEnded={() => { if (contentType === 'series' && selectedEpisode < episodes.length - 1) setSelectedEpisode(selectedEpisode + 1); }} />
                   </div>
                 </div>
               </motion.div>
@@ -354,7 +195,7 @@ export function WatchPage({ contentId, contentType }: WatchPageProps) {
           <div className="grid lg:grid-cols-[2fr_1fr] gap-6">
             {/* Player Column */}
             <div className="flex flex-col gap-4 min-w-0">
-              <PlayerComponent />
+              <VideoPlayer key={`${contentType}-${contentId}-${selectedSeason}-${selectedEpisode}`} src={videoUrl} poster={videoPoster} contentId={contentId} contentType={contentType} selectedSeason={selectedSeason} selectedEpisode={selectedEpisode} initialTime={videoTime} onTimeUpdate={handleTimeUpdate} onEnded={() => { if (contentType === 'series' && selectedEpisode < episodes.length - 1) setSelectedEpisode(selectedEpisode + 1); }} />
 
   {/* Player Controls Bar */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-black/40 backdrop-blur-sm border border-cyan-500/20 rounded-xl p-4 gap-4 shadow-xl">
